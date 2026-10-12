@@ -36,7 +36,7 @@ ON DUPLICATE KEY UPDATE is_deleted = 0;
 
 INSERT INTO Role_Permission (role_id, permission_id, is_deleted)
 SELECT 2, id, 0 FROM `Permission` WHERE name IN
-('Monastery.Create', 'Monastery.View', 'Monastery.Update', 'Monastery.ManageMembers',
+('Monastery.Create', 'Monastery.View', 'Monastery.Update', 'Monastery.Delete', 'Monastery.ManageMembers',
  'Donation.View', 'Donation.Create', 'Donation.Review', 'Donation.Schedule', 'Donation.Cancel') AND is_deleted = 0
 ON DUPLICATE KEY UPDATE is_deleted = 0;
 
