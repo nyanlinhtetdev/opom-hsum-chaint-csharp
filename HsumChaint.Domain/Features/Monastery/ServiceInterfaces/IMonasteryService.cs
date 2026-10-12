@@ -7,6 +7,7 @@ namespace HsumChaint.Domain.Features.Monastery.ServiceInterfaces
     {
         Task<Result<MonasterySpaceDto>> CreateMonastery(int currentUserId, CreateMonasteryRequestDto request);
         Task<Result<MonasterySpaceDto>> UpdateMonastery(int currentUserId, int monasterySpaceId, UpdateMonasteryRequestDto request);
+        Task<Result<bool>> DeleteMonastery(int currentUserId, int monasterySpaceId);
         Task<Result<MonasterySpaceDto>> GetMonastery(int currentUserId, int monasterySpaceId);
         Task<PagedResult<MonasterySpaceDto>> GetMyMonasteries(int currentUserId, PaginationRequest? pagination = null);
         Task<Result<InvitationResponseDto>> InviteMember(int currentUserId, int monasterySpaceId, InviteMemberRequestDto request);

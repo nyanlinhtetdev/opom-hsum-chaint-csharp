@@ -349,7 +349,7 @@ namespace HsumChaint.Domain.Features.Donation.Services
                 return Result<DonationDto>.Failure("Monastery space id is required.");
             }
 
-            var monasteryExists = await _dbContext.MonasterySpaces.AnyAsync(x => x.Id == request.MonasterySpaceId);
+            var monasteryExists = await _dbContext.MonasterySpaces.AnyAsync(x => x.Id == request.MonasterySpaceId && !x.IsDeleted);
             if (!monasteryExists)
             {
                 return Result<DonationDto>.Failure("Monastery not found.");

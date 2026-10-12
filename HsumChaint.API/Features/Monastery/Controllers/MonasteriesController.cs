@@ -77,6 +77,20 @@ namespace HsumChaint.API.Features.Monastery.Controllers
             return response.ToActionResult();
         }
 
+        [HttpDelete("{id}")]
+        [HasPermission(Permissions.Monastery.Delete)]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var response = await _monasteryService.DeleteMonastery(currentUserId.Value, id);
+            return response.ToActionResult();
+        }
+
         [HttpPost("{id}/invitations")]
         [HasPermission(Permissions.Monastery.ManageMembers)]
         public async Task<IActionResult> InviteMember(int id, InviteMemberRequestDto request)
