@@ -135,6 +135,96 @@ public class MonasteryServiceTests
         Assert.Contains("not authorized", response.Message);
     }
 
+    [Fact]
+    public async Task DeleteMonastery_OwnerMonkSucceeds_AndHidesMonasteryFromQueries()
+    {
+        await using var dbContext = CreateDbContext();
+        SeedUser(dbContext, 1, "Owner Monk", "091");
+        SeedUser(dbContext, 2, "Invitee", "092");
+        SeedMonastery(dbContext, 10, 1);
+        await dbContext.SaveChangesAsync();
+        var service = new MonasteryService(dbContext);
+
+        var deleteResponse = await service.DeleteMonastery(1, 10);
+
+        Assert.True(deleteResponse.IsSuccess);
+        Assert.True(deleteResponse.Data);
+        Assert.True(dbContext.MonasterySpaces.Single(x => x.Id == 10).IsDeleted);
+
+        var getResponse = await service.GetMonastery(1, 10);
+        Assert.False(getResponse.IsSuccess);
+
+        var myMonasteries = await service.GetMyMonasteries(1);
+        Assert.Empty(myMonasteries.Data);
+
+        var updateResponse = await service.UpdateMonastery(1, 10, new UpdateMonasteryRequestDto { MonasteryName = "Renamed" });
+        Assert.False(updateResponse.IsSuccess);
+
+        var inviteResponse = await service.InviteMember(1, 10, new InviteMemberRequestDto { UserId = 2, RoleId = 4 });
+        Assert.False(inviteResponse.IsSuccess);
+    }
+
+    [Fact]
+    public async Task DeleteMonastery_RejectsNonOwnerAdmin_NonOwnerMonk_AndNonMonkOwner()
+    {
+        await using var dbContext = CreateDbContext();
+        SeedUser(dbContext, 1, "Owner Monk", "091");
+        SeedUser(dbContext, 2, "Space Admin", "092");
+        SeedUser(dbContext, 3, "Other Monk", "093");
+        SeedUser(dbContext, 4, "NonMonk Owner", "094");
+        SeedMonastery(dbContext, 10, 1);
+        dbContext.MonasteryMembers.AddRange(
+            new MonasteryMember { UserId = 2, MonasterySpaceId = 10, RoleId = 1, IsOwner = false },
+            new MonasteryMember { UserId = 3, MonasterySpaceId = 10, RoleId = 2, IsOwner = false });
+        dbContext.MonasterySpaces.Add(new MonasterySpace
+        {
+            Id = 20,
+            MonasteryName = "Admin Space",
+            CreatedById = 4
+        });
+        dbContext.MonasteryMembers.Add(new MonasteryMember
+        {
+            UserId = 4,
+            MonasterySpaceId = 20,
+            RoleId = 1,
+            IsOwner = true
+        });
+        await dbContext.SaveChangesAsync();
+        var service = new MonasteryService(dbContext);
+
+        var adminAttempt = await service.DeleteMonastery(2, 10);
+        Assert.False(adminAttempt.IsSuccess);
+        Assert.Contains("not authorized", adminAttempt.Message);
+
+        var nonOwnerMonkAttempt = await service.DeleteMonastery(3, 10);
+        Assert.False(nonOwnerMonkAttempt.IsSuccess);
+        Assert.Contains("not authorized", nonOwnerMonkAttempt.Message);
+
+        var nonMonkOwnerAttempt = await service.DeleteMonastery(4, 20);
+        Assert.False(nonMonkOwnerAttempt.IsSuccess);
+        Assert.Contains("not authorized", nonMonkOwnerAttempt.Message);
+    }
+
+    [Fact]
+    public async Task DeleteMonastery_NonExistentOrAlreadyDeleted_ReturnsNotFoundFailure()
+    {
+        await using var dbContext = CreateDbContext();
+        SeedUser(dbContext, 1, "Owner Monk", "091");
+        SeedMonastery(dbContext, 10, 1);
+        await dbContext.SaveChangesAsync();
+        var service = new MonasteryService(dbContext);
+
+        var missingAttempt = await service.DeleteMonastery(1, 999);
+        Assert.False(missingAttempt.IsSuccess);
+        Assert.Contains("not found", missingAttempt.Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.True((await service.DeleteMonastery(1, 10)).IsSuccess);
+
+        var secondAttempt = await service.DeleteMonastery(1, 10);
+        Assert.False(secondAttempt.IsSuccess);
+        Assert.Contains("not found", secondAttempt.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
