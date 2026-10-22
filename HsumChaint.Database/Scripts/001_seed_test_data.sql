@@ -30,7 +30,12 @@ INSERT INTO `Permission` (id, name, is_deleted) VALUES
     (12, 'Donation.Create', 0),
     (13, 'Donation.Review', 0),
     (14, 'Donation.Schedule', 0),
-    (15, 'Donation.Cancel', 0)
+    (15, 'Donation.Cancel', 0),
+    (16, 'Users.Update', 0),
+    (17, 'Invitation.View', 0),
+    (18, 'Invitation.Respond', 0),
+    (19, 'Notification.View', 0),
+    (20, 'Notification.Manage', 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), is_deleted = 0;
 
 -- Admin access is entirely data-driven, including any additional active permissions.
@@ -41,11 +46,14 @@ ON DUPLICATE KEY UPDATE is_deleted = 0;
 INSERT INTO Role_Permission (role_id, permission_id, is_deleted)
 SELECT 2, id, 0 FROM `Permission` WHERE name IN
 ('Monastery.Create', 'Monastery.View', 'Monastery.Update', 'Monastery.Delete', 'Monastery.ManageMembers',
- 'Donation.View', 'Donation.Create', 'Donation.Review', 'Donation.Schedule', 'Donation.Cancel') AND is_deleted = 0
+ 'Donation.View', 'Donation.Create', 'Donation.Review', 'Donation.Schedule', 'Donation.Cancel',
+ 'Users.Update', 'Invitation.View', 'Invitation.Respond', 'Notification.View', 'Notification.Manage') AND is_deleted = 0
 ON DUPLICATE KEY UPDATE is_deleted = 0;
 
 INSERT INTO Role_Permission (role_id, permission_id, is_deleted)
-SELECT 3, id, 0 FROM `Permission` WHERE name IN ('Monastery.View', 'Donation.View', 'Donation.Create', 'Donation.Cancel') AND is_deleted = 0
+SELECT 3, id, 0 FROM `Permission` WHERE name IN
+('Monastery.View', 'Donation.View', 'Donation.Create', 'Donation.Cancel',
+ 'Users.Update', 'Invitation.View', 'Invitation.Respond', 'Notification.View', 'Notification.Manage') AND is_deleted = 0
 ON DUPLICATE KEY UPDATE is_deleted = 0;
 
 -- 3. Space Roles
@@ -72,7 +80,8 @@ INSERT INTO Space_Permission (id, name, description, is_deleted) VALUES
     (9, 'Donation.Create', 'Submit donation requests to this monastery', 0),
     (10, 'Donation.Review', 'Accept, reject, or review donation requests', 0),
     (11, 'Donation.Schedule', 'Schedule pickup/dropoff times for donations', 0),
-    (12, 'Donation.Cancel', 'Cancel scheduled or accepted donations', 0)
+    (12, 'Donation.Cancel', 'Cancel scheduled or accepted donations', 0),
+    (13, 'Space.ViewMembers', 'View monastery space members list', 0)
 ON DUPLICATE KEY UPDATE
     name = VALUES(name),
     description = VALUES(description),
@@ -92,6 +101,7 @@ SELECT 2, id, 0 FROM Space_Permission WHERE name IN (
     'Space.InviteMember',
     'Space.UpdateMemberRole',
     'Space.RemoveMember',
+    'Space.ViewMembers',
     'Donation.View',
     'Donation.Create',
     'Donation.Review',

@@ -46,6 +46,12 @@ public sealed class PermissionAuthorizationHandler(IHttpContextAccessor? httpCon
 
         if (monasterySpaceId.HasValue && currentUserId.HasValue && dbContext != null)
         {
+            if (context.User.IsInRole("Admin"))
+            {
+                context.Succeed(requirement);
+                return;
+            }
+
             var member = await dbContext.MonasteryMembers
                 .Include(m => m.SpaceRole)
                 .AsNoTracking()

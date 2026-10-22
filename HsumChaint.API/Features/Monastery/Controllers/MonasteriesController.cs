@@ -105,6 +105,7 @@ namespace HsumChaint.API.Features.Monastery.Controllers
         }
 
         [HttpPost("invitations/{invitationId}/respond")]
+        [HasPermission(Permissions.Invitation.Respond)]
         public async Task<IActionResult> RespondToInvitation(int invitationId, RespondInvitationRequestDto request)
         {
             var currentUserId = User.GetCurrentUserId();
@@ -118,7 +119,7 @@ namespace HsumChaint.API.Features.Monastery.Controllers
         }
 
         [HttpGet("{id}/members")]
-        [HasPermission(SpacePermissions.SpaceView)]
+        [HasPermission(SpacePermissions.SpaceViewMembers)]
         public async Task<IActionResult> GetMembers(int id, [FromQuery] PaginationRequest pagination)
         {
             var currentUserId = User.GetCurrentUserId();
