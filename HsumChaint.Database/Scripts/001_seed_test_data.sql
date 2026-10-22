@@ -15,28 +15,28 @@ INSERT INTO `Role` (id, name, is_deleted) VALUES
 ON DUPLICATE KEY UPDATE name = VALUES(name), is_deleted = VALUES(is_deleted);
 
 -- 2. System Permissions
-INSERT INTO `Permission` (id, name, is_deleted) VALUES
-    (1, 'Roles.View', 0),
-    (2, 'Roles.Manage', 0),
-    (3, 'Roles.Assign', 0),
-    (4, 'Users.View', 0),
-    (5, 'Users.Manage', 0),
-    (6, 'Monastery.Create', 0),
-    (7, 'Monastery.View', 0),
-    (8, 'Monastery.Update', 0),
-    (9, 'Monastery.Delete', 0),
-    (10, 'Monastery.ManageMembers', 0),
-    (11, 'Donation.View', 0),
-    (12, 'Donation.Create', 0),
-    (13, 'Donation.Review', 0),
-    (14, 'Donation.Schedule', 0),
-    (15, 'Donation.Cancel', 0),
-    (16, 'Users.Update', 0),
-    (17, 'Invitation.View', 0),
-    (18, 'Invitation.Respond', 0),
-    (19, 'Notification.View', 0),
-    (20, 'Notification.Manage', 0)
-ON DUPLICATE KEY UPDATE name = VALUES(name), is_deleted = 0;
+INSERT INTO `Permission` (name, is_deleted) VALUES
+    ('Roles.View', 0),
+    ('Roles.Manage', 0),
+    ('Roles.Assign', 0),
+    ('Users.View', 0),
+    ('Users.Manage', 0),
+    ('Monastery.Create', 0),
+    ('Monastery.View', 0),
+    ('Monastery.Update', 0),
+    ('Monastery.Delete', 0),
+    ('Monastery.ManageMembers', 0),
+    ('Donation.View', 0),
+    ('Donation.Create', 0),
+    ('Donation.Review', 0),
+    ('Donation.Schedule', 0),
+    ('Donation.Cancel', 0),
+    ('Users.Update', 0),
+    ('Invitation.View', 0),
+    ('Invitation.Respond', 0),
+    ('Notification.View', 0),
+    ('Notification.Manage', 0)
+ON DUPLICATE KEY UPDATE is_deleted = 0;
 
 -- Admin access is entirely data-driven, including any additional active permissions.
 INSERT INTO Role_Permission (role_id, permission_id, is_deleted)
@@ -68,22 +68,21 @@ ON DUPLICATE KEY UPDATE
     is_deleted = 0;
 
 -- 4. Space Permissions
-INSERT INTO Space_Permission (id, name, description, is_deleted) VALUES
-    (1, 'Space.View', 'View monastery space details and announcements', 0),
-    (2, 'Space.Update', 'Update monastery name, description, and contact info', 0),
-    (3, 'Space.Delete', 'Delete the monastery space (Owner only)', 0),
-    (4, 'Space.InviteMember', 'Invite new members to the monastery space', 0),
-    (5, 'Space.UpdateMemberRole', 'Update an existing member\'s space role', 0),
-    (6, 'Space.RemoveMember', 'Remove a member from the monastery space', 0),
-    (7, 'Space.TransferOwnership', 'Transfer ownership to another monk (Owner only)', 0),
-    (8, 'Donation.View', 'View donations inside this monastery space', 0),
-    (9, 'Donation.Create', 'Submit donation requests to this monastery', 0),
-    (10, 'Donation.Review', 'Accept, reject, or review donation requests', 0),
-    (11, 'Donation.Schedule', 'Schedule pickup/dropoff times for donations', 0),
-    (12, 'Donation.Cancel', 'Cancel scheduled or accepted donations', 0),
-    (13, 'Space.ViewMembers', 'View monastery space members list', 0)
+INSERT INTO Space_Permission (name, description, is_deleted) VALUES
+    ('Space.View', 'View monastery space details and announcements', 0),
+    ('Space.Update', 'Update monastery name, description, and contact info', 0),
+    ('Space.Delete', 'Delete the monastery space (Owner only)', 0),
+    ('Space.InviteMember', 'Invite new members to the monastery space', 0),
+    ('Space.UpdateMemberRole', 'Update an existing member\'s space role', 0),
+    ('Space.RemoveMember', 'Remove a member from the monastery space', 0),
+    ('Space.TransferOwnership', 'Transfer ownership to another monk (Owner only)', 0),
+    ('Donation.View', 'View donations inside this monastery space', 0),
+    ('Donation.Create', 'Submit donation requests to this monastery', 0),
+    ('Donation.Review', 'Accept, reject, or review donation requests', 0),
+    ('Donation.Schedule', 'Schedule pickup/dropoff times for donations', 0),
+    ('Donation.Cancel', 'Cancel scheduled or accepted donations', 0),
+    ('Space.ViewMembers', 'View monastery space members list', 0)
 ON DUPLICATE KEY UPDATE
-    name = VALUES(name),
     description = VALUES(description),
     is_deleted = 0;
 
