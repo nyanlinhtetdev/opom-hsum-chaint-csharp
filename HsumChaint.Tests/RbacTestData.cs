@@ -20,8 +20,11 @@ internal static class RbacTestData
         {
             db.Permissions.Add(new Permission { Id = id, Name = name });
             db.RolePermissions.Add(new RolePermission { RoleId = 1, PermissionId = id });
-            if (name.StartsWith("Monastery.") || name.StartsWith("Donation."))
+            if (name.StartsWith("Monastery.") || name.StartsWith("Donation.") || name.StartsWith("Invitation.") || name.StartsWith("Notification.") || name == Permissions.Users.Update)
                 db.RolePermissions.Add(new RolePermission { RoleId = 2, PermissionId = id });
+            if (name is Permissions.Monastery.View or Permissions.Donation.View or Permissions.Donation.Create or Permissions.Donation.Cancel
+                or Permissions.Invitation.View or Permissions.Invitation.Respond or Permissions.Notification.View or Permissions.Notification.Manage or Permissions.Users.Update)
+                db.RolePermissions.Add(new RolePermission { RoleId = 3, PermissionId = id });
             if (name is Permissions.Donation.Schedule or Permissions.Donation.View or Permissions.Monastery.View)
                 db.RolePermissions.Add(new RolePermission { RoleId = 4, PermissionId = id });
             id++;
@@ -54,6 +57,7 @@ internal static class RbacTestData
             // Admin (2)
             if (name is SpacePermissions.SpaceView or SpacePermissions.SpaceUpdate
                 or SpacePermissions.SpaceInviteMember or SpacePermissions.SpaceUpdateMemberRole or SpacePermissions.SpaceRemoveMember
+                or SpacePermissions.SpaceViewMembers
                 or SpacePermissions.DonationView or SpacePermissions.DonationCreate or SpacePermissions.DonationReview
                 or SpacePermissions.DonationSchedule or SpacePermissions.DonationCancel)
             {

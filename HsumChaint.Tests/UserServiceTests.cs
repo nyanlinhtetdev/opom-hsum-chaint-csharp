@@ -1,7 +1,12 @@
+using System.Security.Claims;
+using HsumChaint.API.Features.User.Controllers;
 using HsumChaint.Database.Models;
 using HsumChaint.Domain.Features.User.DTOs;
 using HsumChaint.Domain.Features.User.Services;
+using HsumChaint.Shared.Authorization;
 using HsumChaint.Shared.CommonEnum;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using InfrastructureUser = HsumChaint.Database.Models.User;
@@ -59,6 +64,94 @@ public class UserServiceTests
 
         Assert.True(response.IsSuccess);
         Assert.Equal("Updated", (await dbContext.Users.FindAsync(1))!.Name);
+    }
+
+    [Fact]
+    public async Task GetUserInvitationList_ReturnsEnrichedInvitations()
+    {
+        await using var db = CreateDbContext();
+        var monastery = new MonasterySpace { Id = 10, MonasteryName = "Mahagandhayon" };
+        var inviter = new InfrastructureUser { Id = 2, Name = "Monk U Thawbana", PhoneNumber = "0922222222", Password = "pw", RoleId = 2, IsDeleted = false };
+        var invitee = new InfrastructureUser { Id = 3, Name = "Ko Mg Mg", PhoneNumber = "0933333333", Password = "pw", RoleId = 3, IsDeleted = false };
+        var spaceRole = await db.SpaceRoles.FindAsync(SpaceRoles.EditorId);
+
+        db.MonasterySpaces.Add(monastery);
+        db.Users.AddRange(inviter, invitee);
+
+        db.Invitations.Add(new Invitation
+        {
+            Id = 1,
+            MonasterySpaceId = 10,
+            MonasterySpace = monastery,
+            InvitedById = 2,
+            InvitedBy = inviter,
+            InvitedUserId = 3,
+            InvitedUser = invitee,
+            SpaceRoleId = SpaceRoles.EditorId,
+            SpaceRole = spaceRole,
+            Status = InvitationStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var service = new UserService(db);
+        var result = await service.GetUserInvitationList(3);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Data!);
+        var inviteDto = result.Data!.First();
+        Assert.Equal(1, inviteDto.Id);
+        Assert.Equal(10, inviteDto.MonasterySpaceId);
+        Assert.Equal("Mahagandhayon", inviteDto.MonasterySpaceName);
+        Assert.Equal(2, inviteDto.InvitedById);
+        Assert.Equal("Monk U Thawbana", inviteDto.InvitedByName);
+        Assert.Equal(3, inviteDto.InvitedUserId);
+        Assert.Equal("Ko Mg Mg", inviteDto.InvitedUserName);
+        Assert.Equal(SpaceRoles.EditorId, inviteDto.SpaceRoleId);
+        Assert.Equal(SpaceRoles.Editor, inviteDto.SpaceRoleName);
+        Assert.Equal(InvitationStatus.Pending, inviteDto.Status);
+    }
+
+    [Fact]
+    public async Task UserController_GetUserInvitationList_AllowsSelfAndAdmin_ForbidsOthers()
+    {
+        await using var db = CreateDbContext();
+        var userService = new UserService(db);
+        var controller = new UserController(userService);
+
+        // 1. User 3 viewing their own invitations -> OK (200)
+        var userClaims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, "3"),
+            new(ClaimTypes.Role, "User"),
+            new("permission", Permissions.Invitation.View)
+        };
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(userClaims, "test")) }
+        };
+
+        var ownResult = await controller.GetUserInvitationList(3, new());
+        Assert.IsType<OkObjectResult>(ownResult);
+
+        // 2. User 3 viewing User 4's invitations -> Forbid (403)
+        var otherResult = await controller.GetUserInvitationList(4, new());
+        Assert.IsType<ForbidResult>(otherResult);
+
+        // 3. Admin viewing User 4's invitations -> OK (200)
+        var adminClaims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, "1"),
+            new(ClaimTypes.Role, "Admin"),
+            new("permission", Permissions.Users.View)
+        };
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(adminClaims, "test")) }
+        };
+
+        var adminResult = await controller.GetUserInvitationList(4, new());
+        Assert.IsType<OkObjectResult>(adminResult);
     }
 
     private static AppDbContext CreateDbContext()

@@ -131,8 +131,8 @@ public class PaginationServiceTests
         var first = await service.GetPermissions();
         var second = await service.GetPermissions(new() { PageNumber = 2 });
         Assert.Equal(10, first.Data.Count);
-        Assert.Equal(4, second.Data.Count);
-        Assert.Equal(14, first.Pagination.TotalCount);
+        Assert.Equal(HsumChaint.Shared.Authorization.Permissions.All.Count - 1 - 10, second.Data.Count);
+        Assert.Equal(HsumChaint.Shared.Authorization.Permissions.All.Count - 1, first.Pagination.TotalCount);
         Assert.Empty(first.Data.Select(p => p.Id).Intersect(second.Data.Select(p => p.Id)));
         Assert.DoesNotContain(first.Data.Concat(second.Data), p => p.Id == 1);
     }

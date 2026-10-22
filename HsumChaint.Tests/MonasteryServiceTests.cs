@@ -57,7 +57,8 @@ public class MonasteryServiceTests
 
         // 6. Now UpdateMemberRole and RemoveMember succeed!
         Assert.True((await service.UpdateMemberRole(2, 10, 3, new() { SpaceRoleId = SpaceRoles.EditorId })).IsSuccess);
-        Assert.Equal("Editor", (await service.GetMembers(2, 10)).Data!.Single(m => m.UserId == 3).SpaceRoleName);
+        Assert.False((await service.GetMembers(2, 10)).IsSuccess);
+        Assert.Equal("Editor", (await service.GetMembers(1, 10)).Data!.Single(m => m.UserId == 3).SpaceRoleName);
         Assert.True((await service.RemoveMember(2, 10, 3)).IsSuccess);
     }
 
@@ -245,6 +246,68 @@ public class MonasteryServiceTests
         var secondAttempt = await service.DeleteMonastery(1, 10);
         Assert.False(secondAttempt.IsSuccess);
         Assert.Contains("not found", secondAttempt.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetMembers_RestrictedToOwner_SpaceAdmin_AndSystemAdmin()
+    {
+        await using var db = CreateDbContext();
+        // 1: System Admin (roleId = 1)
+        SeedUser(db, 1, "System Admin", "091", roleId: 1);
+        // 2: Space Owner (roleId = 2)
+        SeedUser(db, 2, "Space Owner", "092", roleId: 2);
+        // 3: Space Admin (roleId = 3)
+        SeedUser(db, 3, "Space Admin", "093", roleId: 3);
+        // 4: Space Viewer (roleId = 3)
+        SeedUser(db, 4, "Space Viewer", "094", roleId: 3);
+        // 5: Outsider User (roleId = 3)
+        SeedUser(db, 5, "Outsider", "095", roleId: 3);
+
+        SeedMonastery(db, 10, 2); // User 2 is Owner
+
+        // Add User 3 as Space Admin
+        db.MonasteryMembers.Add(new MonasteryMember
+        {
+            UserId = 3,
+            MonasterySpaceId = 10,
+            SpaceRoleId = SpaceRoles.AdminId
+        });
+
+        // Add User 4 as Space Viewer
+        db.MonasteryMembers.Add(new MonasteryMember
+        {
+            UserId = 4,
+            MonasterySpaceId = 10,
+            SpaceRoleId = SpaceRoles.ViewerId
+        });
+
+        await db.SaveChangesAsync();
+        var service = new MonasteryService(db);
+
+        // 1. Space Owner CAN view members
+        var ownerResult = await service.GetMembers(2, 10);
+        Assert.True(ownerResult.IsSuccess);
+        Assert.Equal(3, ownerResult.Data!.Count);
+
+        // 2. Space Admin CAN view members
+        var adminResult = await service.GetMembers(3, 10);
+        Assert.True(adminResult.IsSuccess);
+        Assert.Equal(3, adminResult.Data!.Count);
+
+        // 3. System Admin CAN view members (even without MonasteryMember record)
+        var sysAdminResult = await service.GetMembers(1, 10);
+        Assert.True(sysAdminResult.IsSuccess);
+        Assert.Equal(3, sysAdminResult.Data!.Count);
+
+        // 4. Space Viewer CANNOT view members
+        var viewerResult = await service.GetMembers(4, 10);
+        Assert.False(viewerResult.IsSuccess);
+        Assert.Contains("not authorized", viewerResult.Message, StringComparison.OrdinalIgnoreCase);
+
+        // 5. Outsider CANNOT view members
+        var outsiderResult = await service.GetMembers(5, 10);
+        Assert.False(outsiderResult.IsSuccess);
+        Assert.Contains("not authorized", outsiderResult.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static AppDbContext CreateDbContext()
