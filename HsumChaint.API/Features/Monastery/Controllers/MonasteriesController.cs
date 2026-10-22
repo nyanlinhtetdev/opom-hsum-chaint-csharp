@@ -21,6 +21,14 @@ namespace HsumChaint.API.Features.Monastery.Controllers
             _monasteryService = monasteryService;
         }
 
+        [AllowAnonymous]
+        [HttpGet]
+        public async Task<IActionResult> GetMonasteries([FromQuery] string? searchTerm, [FromQuery] PaginationRequest pagination)
+        {
+            var response = await _monasteryService.GetMonasteries(searchTerm, pagination);
+            return response.ToActionResult();
+        }
+
         [HttpPost]
         [HasPermission(Permissions.Monastery.Create)]
         public async Task<IActionResult> Create(CreateMonasteryRequestDto request)

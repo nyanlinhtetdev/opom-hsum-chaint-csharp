@@ -118,6 +118,41 @@ namespace HsumChaint.Domain.Features.Monastery.Services
             return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, member.SpaceRoleId, member.SpaceRole?.Name, member.IsOwner == true), "Monastery retrieved successfully.");
         }
 
+        public async Task<PagedResult<MonasterySpaceDto>> GetMonasteries(string? searchTerm, PaginationRequest? pagination = null)
+        {
+            var pageNumber = pagination?.PageNumber ?? 1;
+            var pageSize = pagination?.PageSize ?? 10;
+            if (pageNumber < 1 || pageSize < 1 || ((long)pageNumber - 1) * pageSize > int.MaxValue)
+            {
+                return PagedResult<MonasterySpaceDto>.Failure("Page number and page size must be positive and within the supported range.");
+            }
+
+            var query = ActiveMonasteries.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim();
+                query = query.Where(x => (x.MonasteryName != null && x.MonasteryName.Contains(term)) ||
+                                         (x.Address != null && x.Address.Contains(term)));
+            }
+
+            var totalCount = await query.CountAsync();
+            var monasteries = await query.OrderBy(x => x.Id)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new MonasterySpaceDto
+                {
+                    Id = x.Id,
+                    MonasteryName = x.MonasteryName,
+                    Description = x.Description,
+                    Address = x.Address,
+                    CreatedById = x.CreatedById
+                })
+                .ToListAsync();
+
+            return PagedResult<MonasterySpaceDto>.Success(monasteries, new Pagination(pageNumber, pageSize, totalCount), "Monasteries retrieved successfully.");
+        }
+
         public async Task<PagedResult<MonasterySpaceDto>> GetMyMonasteries(int currentUserId, PaginationRequest? pagination = null)
         {
             var pageNumber = pagination?.PageNumber ?? 1;

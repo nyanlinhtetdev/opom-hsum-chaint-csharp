@@ -5,6 +5,7 @@ namespace HsumChaint.Domain.Features.Monastery.ServiceInterfaces
 {
     public interface IMonasteryService
     {
+        Task<PagedResult<MonasterySpaceDto>> GetMonasteries(string? searchTerm, PaginationRequest? pagination = null);
         Task<Result<MonasterySpaceDto>> CreateMonastery(int currentUserId, CreateMonasteryRequestDto request);
         Task<Result<MonasterySpaceDto>> UpdateMonastery(int currentUserId, int monasterySpaceId, UpdateMonasteryRequestDto request);
         Task<Result<bool>> DeleteMonastery(int currentUserId, int monasterySpaceId);
