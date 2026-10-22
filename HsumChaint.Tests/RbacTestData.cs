@@ -59,7 +59,7 @@ internal static class RbacTestData
                 or SpacePermissions.SpaceInviteMember or SpacePermissions.SpaceUpdateMemberRole or SpacePermissions.SpaceRemoveMember
                 or SpacePermissions.SpaceViewMembers
                 or SpacePermissions.DonationView or SpacePermissions.DonationCreate or SpacePermissions.DonationReview
-                or SpacePermissions.DonationSchedule or SpacePermissions.DonationCancel)
+                or SpacePermissions.DonationSchedule or SpacePermissions.DonationCancel or SpacePermissions.DonationDelete)
             {
                 db.SpaceRolePermissions.Add(new SpaceRolePermission
                 {
@@ -73,7 +73,7 @@ internal static class RbacTestData
 
             // Editor (3)
             if (name is SpacePermissions.SpaceView or SpacePermissions.DonationView or SpacePermissions.DonationCreate
-                or SpacePermissions.DonationReview or SpacePermissions.DonationSchedule)
+                or SpacePermissions.DonationReview or SpacePermissions.DonationSchedule or SpacePermissions.DonationCancel or SpacePermissions.DonationDelete)
             {
                 db.SpaceRolePermissions.Add(new SpaceRolePermission
                 {
