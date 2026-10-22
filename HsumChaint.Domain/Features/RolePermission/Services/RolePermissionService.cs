@@ -65,10 +65,8 @@ public class RolePermissionService(AppDbContext db) : IRolePermissionService
         var role = await ActiveRoles.FirstOrDefaultAsync(r => r.Id == id);
         if (role == null) return Result<bool>.Failure("Role not found.");
         if (IsAdmin(role)) return Result<bool>.Failure("The system Admin role cannot be deleted.");
-        if (await db.Users.AnyAsync(u => u.RoleId == id && u.IsDeleted == false)
-            || await db.MonasteryMembers.AnyAsync(m => m.RoleId == id)
-            || await db.Invitations.AnyAsync(i => i.RoleId == id && i.Status == HsumChaint.Shared.CommonEnum.InvitationStatus.Pending))
-            return Result<bool>.Failure("Role is assigned to users, members or pending invitations.");
+        if (await db.Users.AnyAsync(u => u.RoleId == id && u.IsDeleted == false))
+            return Result<bool>.Failure("Role is assigned to users.");
         role.IsDeleted = true;
         await db.SaveChangesAsync();
         return Result<bool>.Success(true, "Successful.");

@@ -394,7 +394,7 @@ namespace HsumChaint.Domain.Features.Donation.Services
             var managerIds = await _dbContext.MonasteryMembers
                 .AsNoTracking()
                 .Where(x => x.MonasterySpaceId == monasterySpaceId
-                    && (x.IsOwner == true || _dbContext.RolePermissions.Any(rp => rp.RoleId == x.RoleId && !rp.IsDeleted && !rp.Role.IsDeleted && !rp.Permission.IsDeleted && rp.Permission.Name == Permissions.Donation.Review)))
+                    && (x.IsOwner == true || _dbContext.SpaceRolePermissions.Any(srp => srp.SpaceRoleId == x.SpaceRoleId && !srp.IsDeleted && !srp.SpaceRole.IsDeleted && !srp.SpacePermission.IsDeleted && srp.SpacePermission.Name == SpacePermissions.DonationReview)))
                 .Select(x => x.UserId)
                 .Where(x => x.HasValue)
                 .Select(x => x!.Value)
@@ -441,16 +441,16 @@ namespace HsumChaint.Domain.Features.Donation.Services
 
         private async Task<bool> CanManageDonations(MonasteryMember? member)
         {
-            return member is not null && (member.IsOwner == true || await HasRolePermission(member.RoleId, Permissions.Donation.Review));
+            return member is not null && (member.IsOwner == true || await HasRolePermission(member.SpaceRoleId, SpacePermissions.DonationReview));
         }
 
         private async Task<bool> CanScheduleDonations(MonasteryMember? member)
         {
-            return member is not null && (member.IsOwner == true || await HasRolePermission(member.RoleId, Permissions.Donation.Schedule));
+            return member is not null && (member.IsOwner == true || await HasRolePermission(member.SpaceRoleId, SpacePermissions.DonationSchedule));
         }
 
-        private Task<bool> HasRolePermission(int roleId, string permission) => _dbContext.RolePermissions.AnyAsync(rp =>
-            rp.RoleId == roleId && !rp.IsDeleted && !rp.Role.IsDeleted && !rp.Permission.IsDeleted && rp.Permission.Name == permission);
+        private Task<bool> HasRolePermission(int spaceRoleId, string permission) => _dbContext.SpaceRolePermissions.AnyAsync(rp =>
+            rp.SpaceRoleId == spaceRoleId && !rp.IsDeleted && !rp.SpaceRole.IsDeleted && !rp.SpacePermission.IsDeleted && rp.SpacePermission.Name == permission);
 
         private static DonationDto MapDonation(DonationEntity donation)
         {

@@ -125,7 +125,7 @@ namespace HsumChaint.Domain.Features.User.Services
 
             try
             {
-                var query = _context.Invitations.Include(i => i.Role).AsNoTracking().Where(i => i.InvitedUserId == id);
+                var query = _context.Invitations.Include(i => i.SpaceRole).AsNoTracking().Where(i => i.InvitedUserId == id);
                 var totalCount = await query.CountAsync();
                 var items = await query.OrderBy(x => x.Id)
                     .Skip((pageNumber - 1) * pageSize)
@@ -151,7 +151,7 @@ namespace HsumChaint.Domain.Features.User.Services
 
             try
             {
-                var query = _context.Invitations.Include(i => i.Role).AsNoTracking().Where(i => i.InvitedById == id);
+                var query = _context.Invitations.Include(i => i.SpaceRole).AsNoTracking().Where(i => i.InvitedById == id);
                 var totalCount = await query.CountAsync();
                 var items = await query.OrderBy(x => x.Id)
                     .Skip((pageNumber - 1) * pageSize)
@@ -246,8 +246,8 @@ namespace HsumChaint.Domain.Features.User.Services
                 MonasterySpaceId = invitation.MonasterySpaceId,
                 InvitedUserId = invitation.InvitedUserId,
                 InvitedById = invitation.InvitedById,
-                RoleId = invitation.RoleId,
-                RoleName = invitation.Role?.Name,
+                SpaceRoleId = invitation.SpaceRoleId,
+                SpaceRoleName = invitation.SpaceRole?.Name,
                 Status = invitation.Status,
                 CreatedAt = invitation.CreatedAt
             };
