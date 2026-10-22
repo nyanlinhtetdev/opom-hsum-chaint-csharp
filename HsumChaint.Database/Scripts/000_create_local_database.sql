@@ -8,7 +8,7 @@ CREATE DATABASE IF NOT EXISTS hsumchaint_db
 
 USE hsumchaint_db;
 
--- 1. Access Control: Role & Permission Tables
+-- 1. Access Control: System Role & Permission Tables
 CREATE TABLE IF NOT EXISTS Role (
     id INT NOT NULL AUTO_INCREMENT,
     name VARCHAR(50) NOT NULL,
@@ -39,6 +39,46 @@ CREATE TABLE IF NOT EXISTS Role_Permission (
         ON DELETE CASCADE,
     CONSTRAINT FK_Role_Permission_Permission_permission_id
         FOREIGN KEY (permission_id) REFERENCES Permission (id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 1.1 Space Access Control: Space Role & Space Permission Tables
+CREATE TABLE IF NOT EXISTS Space_Role (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(50) NOT NULL,
+    description VARCHAR(255) NULL,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY UX_Space_Role_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS Space_Permission (
+    id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    description VARCHAR(255) NULL,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY UX_Space_Permission_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS Space_Role_Permission (
+    id INT NOT NULL AUTO_INCREMENT,
+    space_role_id INT NOT NULL,
+    space_permission_id INT NOT NULL,
+    is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY UX_Space_Role_Permission (space_role_id, space_permission_id),
+    KEY IX_Space_Role_Permission_role_id (space_role_id),
+    KEY IX_Space_Role_Permission_permission_id (space_permission_id),
+    CONSTRAINT FK_Space_Role_Permission_Space_Role_role_id
+        FOREIGN KEY (space_role_id) REFERENCES Space_Role (id)
+        ON DELETE CASCADE,
+    CONSTRAINT FK_Space_Role_Permission_Space_Permission_permission_id
+        FOREIGN KEY (space_permission_id) REFERENCES Space_Permission (id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -89,24 +129,25 @@ CREATE TABLE IF NOT EXISTS Monastery_Space (
         FOREIGN KEY (created_by_id) REFERENCES User (id)
         ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS Monastery_Member (
     id INT NOT NULL AUTO_INCREMENT,
     user_id INT NULL,
     monastery_space_id INT NULL,
-    role_id INT NOT NULL,
+    space_role_id INT NOT NULL,
     is_owner TINYINT(1) NULL DEFAULT 0,
     PRIMARY KEY (id),
     UNIQUE KEY UX_Monastery_Member_user_space (user_id, monastery_space_id),
     KEY IX_Monastery_Member_monastery_space_id (monastery_space_id),
-    KEY IX_Monastery_Member_role_id (role_id),
+    KEY IX_Monastery_Member_space_role_id (space_role_id),
     CONSTRAINT FK_Monastery_Member_User_user_id
         FOREIGN KEY (user_id) REFERENCES User (id)
         ON DELETE CASCADE,
     CONSTRAINT FK_Monastery_Member_Monastery_Space_monastery_space_id
         FOREIGN KEY (monastery_space_id) REFERENCES Monastery_Space (id)
         ON DELETE CASCADE,
-    CONSTRAINT FK_Monastery_Member_Role_role_id
-        FOREIGN KEY (role_id) REFERENCES Role (id)
+    CONSTRAINT FK_Monastery_Member_Space_Role_space_role_id
+        FOREIGN KEY (space_role_id) REFERENCES Space_Role (id)
         ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -115,13 +156,14 @@ CREATE TABLE IF NOT EXISTS Invitation (
     monastery_space_id INT NULL,
     invited_user_id INT NULL,
     invited_by_id INT NULL,
-    role INT NOT NULL DEFAULT 3,
+    space_role_id INT NOT NULL DEFAULT 4,
     status INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY IX_Invitation_monastery_space_id (monastery_space_id),
     KEY IX_Invitation_invited_user_id (invited_user_id),
     KEY IX_Invitation_invited_by_id (invited_by_id),
+    KEY IX_Invitation_space_role_id (space_role_id),
     CONSTRAINT FK_Invitation_Monastery_Space_monastery_space_id
         FOREIGN KEY (monastery_space_id) REFERENCES Monastery_Space (id)
         ON DELETE CASCADE,
@@ -130,7 +172,10 @@ CREATE TABLE IF NOT EXISTS Invitation (
         ON DELETE CASCADE,
     CONSTRAINT FK_Invitation_User_invited_by_id
         FOREIGN KEY (invited_by_id) REFERENCES User (id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
+    CONSTRAINT FK_Invitation_Space_Role_space_role_id
+        FOREIGN KEY (space_role_id) REFERENCES Space_Role (id)
+        ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Operations & Donor Management
@@ -184,6 +229,7 @@ CREATE TABLE IF NOT EXISTS Notification (
         FOREIGN KEY (user_id) REFERENCES User (id)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS Refresh_Token (
     id INT NOT NULL AUTO_INCREMENT,
     user_id INT NULL,

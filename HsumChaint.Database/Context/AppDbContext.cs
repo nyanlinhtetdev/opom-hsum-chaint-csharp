@@ -21,6 +21,12 @@ public partial class AppDbContext : DbContext
 
     public virtual DbSet<RolePermission> RolePermissions { get; set; }
 
+    public virtual DbSet<SpaceRole> SpaceRoles { get; set; }
+
+    public virtual DbSet<SpacePermission> SpacePermissions { get; set; }
+
+    public virtual DbSet<SpaceRolePermission> SpaceRolePermissions { get; set; }
+
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<MonkProfile> MonkProfiles { get; set; }
@@ -101,6 +107,92 @@ public partial class AppDbContext : DbContext
                 .HasForeignKey(d => d.PermissionId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("FK_Role_Permission_Permission_permission_id");
+        });
+
+        modelBuilder.Entity<SpaceRole>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("Space_Role");
+
+            entity.HasIndex(e => e.Name, "UX_Space_Role_name").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(50)
+                .HasColumnName("name");
+            entity.Property(e => e.Description)
+                .HasMaxLength(255)
+                .HasColumnName("description");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValue(false)
+                .HasColumnName("is_deleted");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<SpacePermission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("Space_Permission");
+
+            entity.HasIndex(e => e.Name, "UX_Space_Permission_name").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(100)
+                .HasColumnName("name");
+            entity.Property(e => e.Description)
+                .HasMaxLength(255)
+                .HasColumnName("description");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValue(false)
+                .HasColumnName("is_deleted");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
+                .HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<SpaceRolePermission>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("Space_Role_Permission");
+
+            entity.HasIndex(e => new { e.SpaceRoleId, e.SpacePermissionId }, "UX_Space_Role_Permission").IsUnique();
+            entity.HasIndex(e => e.SpaceRoleId, "IX_Space_Role_Permission_role_id");
+            entity.HasIndex(e => e.SpacePermissionId, "IX_Space_Role_Permission_permission_id");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SpaceRoleId).HasColumnName("space_role_id");
+            entity.Property(e => e.SpacePermissionId).HasColumnName("space_permission_id");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValue(false)
+                .HasColumnName("is_deleted");
+
+            entity.HasOne(d => d.SpaceRole).WithMany(p => p.SpaceRolePermissions)
+                .HasForeignKey(d => d.SpaceRoleId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Space_Role_Permission_Space_Role_role_id");
+
+            entity.HasOne(d => d.SpacePermission).WithMany(p => p.SpaceRolePermissions)
+                .HasForeignKey(d => d.SpacePermissionId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Space_Role_Permission_Space_Permission_permission_id");
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -195,18 +287,28 @@ public partial class AppDbContext : DbContext
 
             entity.HasIndex(e => new { e.UserId, e.MonasterySpaceId }, "UX_Monastery_Member_user_space").IsUnique();
             entity.HasIndex(e => e.MonasterySpaceId, "IX_Monastery_Member_monastery_space_id");
-            entity.HasIndex(e => e.RoleId, "IX_Monastery_Member_role_id");
+            entity.HasIndex(e => e.SpaceRoleId, "IX_Monastery_Member_space_role_id");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.IsOwner).HasDefaultValue(false).HasColumnName("is_owner");
             entity.Property(e => e.MonasterySpaceId).HasColumnName("monastery_space_id");
-            entity.Property(e => e.RoleId).HasColumnName("role_id");
+            entity.Property(e => e.SpaceRoleId).HasColumnName("space_role_id");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
-            entity.HasOne(d => d.Role).WithMany(p => p.MonasteryMembers)
-                .HasForeignKey(d => d.RoleId)
+            entity.HasOne(d => d.SpaceRole).WithMany(p => p.MonasteryMembers)
+                .HasForeignKey(d => d.SpaceRoleId)
                 .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("FK_Monastery_Member_Role_role_id");
+                .HasConstraintName("FK_Monastery_Member_Space_Role_space_role_id");
+
+            entity.HasOne(d => d.User).WithMany()
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Monastery_Member_User_user_id");
+
+            entity.HasOne(d => d.MonasterySpace).WithMany()
+                .HasForeignKey(d => d.MonasterySpaceId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Monastery_Member_Monastery_Space_monastery_space_id");
         });
 
         modelBuilder.Entity<Invitation>(entity =>
@@ -218,6 +320,7 @@ public partial class AppDbContext : DbContext
             entity.HasIndex(e => e.MonasterySpaceId, "IX_Invitation_monastery_space_id");
             entity.HasIndex(e => e.InvitedUserId, "IX_Invitation_invited_user_id");
             entity.HasIndex(e => e.InvitedById, "IX_Invitation_invited_by_id");
+            entity.HasIndex(e => e.SpaceRoleId, "IX_Invitation_space_role_id");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
@@ -227,8 +330,11 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.InvitedById).HasColumnName("invited_by_id");
             entity.Property(e => e.InvitedUserId).HasColumnName("invited_user_id");
             entity.Property(e => e.MonasterySpaceId).HasColumnName("monastery_space_id");
-            entity.Property(e => e.RoleId).HasColumnName("role");
-            entity.HasOne(e => e.Role).WithMany().HasForeignKey(e => e.RoleId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(e => e.SpaceRoleId).HasColumnName("space_role_id");
+            entity.HasOne(e => e.SpaceRole).WithMany(p => p.Invitations)
+                .HasForeignKey(e => e.SpaceRoleId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_Invitation_Space_Role_space_role_id");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>();
         });
 
@@ -249,29 +355,18 @@ public partial class AppDbContext : DbContext
             entity.Property(e => e.CustomDonationType).HasMaxLength(255).HasColumnName("custom_donation_type");
             entity.Property(e => e.DonorId).HasColumnName("donor_id");
             entity.Property(e => e.DonorName).HasMaxLength(255).HasColumnName("donor_name");
-            entity.Property(e => e.MonasterySpaceId).HasColumnName("monastery_space_id");
             entity.Property(e => e.Note).HasMaxLength(1000).HasColumnName("note");
-            entity.Property(e => e.Amount).HasColumnName("amount").HasPrecision(18, 2);
-            entity.Property(e => e.Quantity).HasColumnName("quantity").HasPrecision(18, 2);
+            entity.Property(e => e.MonasterySpaceId).HasColumnName("monastery_space_id");
             entity.Property(e => e.ReviewerId).HasColumnName("reviewer_id");
             entity.Property(e => e.Status).HasMaxLength(100).HasColumnName("status");
             entity.Property(e => e.StatusValue).HasColumnName("status_value").HasConversion<int>();
-            entity.Property(e => e.CreatedAt)
-                .HasColumnType("datetime")
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnName("created_at");
-            entity.Property(e => e.ReviewedAt)
-                .HasColumnType("datetime")
-                .HasColumnName("reviewed_at");
-            entity.Property(e => e.PickupTime)
-                .HasColumnType("datetime")
-                .HasColumnName("pickup_time");
-            entity.Property(e => e.DropoffTime)
-                .HasColumnType("datetime")
-                .HasColumnName("dropoff_time");
-            entity.Property(e => e.CompletedAt)
-                .HasColumnType("datetime")
-                .HasColumnName("completed_at");
+            entity.Property(e => e.Amount).HasPrecision(18, 2).HasColumnName("amount");
+            entity.Property(e => e.Quantity).HasPrecision(18, 2).HasColumnName("quantity");
+            entity.Property(e => e.CreatedAt).HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created_at");
+            entity.Property(e => e.ReviewedAt).HasColumnType("datetime").HasColumnName("reviewed_at");
+            entity.Property(e => e.PickupTime).HasColumnType("datetime").HasColumnName("pickup_time");
+            entity.Property(e => e.DropoffTime).HasColumnType("datetime").HasColumnName("dropoff_time");
+            entity.Property(e => e.CompletedAt).HasColumnType("datetime").HasColumnName("completed_at");
         });
 
         modelBuilder.Entity<Notification>(entity =>
@@ -284,14 +379,20 @@ public partial class AppDbContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
-                .HasColumnType("datetime")
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
                 .HasColumnName("created_at");
-            entity.Property(e => e.IsRead).HasDefaultValue(false).HasColumnName("is_read");
-            entity.Property(e => e.Message).HasMaxLength(1000).HasColumnName("message");
+            entity.Property(e => e.IsDeleted)
+                .HasDefaultValue(false)
+                .HasColumnName("is_deleted");
+            entity.Property(e => e.IsRead)
+                .HasDefaultValue(false)
+                .HasColumnName("is_read");
+            entity.Property(e => e.Message)
+                .HasMaxLength(1000)
+                .HasColumnName("message");
             entity.Property(e => e.Type).HasColumnName("type").HasConversion<int>();
             entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false).HasColumnName("is_deleted");
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>
@@ -304,13 +405,15 @@ public partial class AppDbContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.CreatedAt)
-                .HasColumnType("datetime")
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime")
                 .HasColumnName("created_at");
             entity.Property(e => e.ExpiresAt)
                 .HasColumnType("datetime")
                 .HasColumnName("expires_at");
-            entity.Property(e => e.RefreshToken1).HasMaxLength(512).HasColumnName("refresh_token");
+            entity.Property(e => e.RefreshToken1)
+                .HasMaxLength(512)
+                .HasColumnName("refresh_token");
             entity.Property(e => e.RevokedAt)
                 .HasColumnType("datetime")
                 .HasColumnName("revoked_at");
