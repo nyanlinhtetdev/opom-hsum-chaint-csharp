@@ -151,6 +151,66 @@ namespace HsumChaint.API.Features.User.Controllers
 
         #endregion
 
+        #region MonkProfile
+
+        [HttpGet("{id}/monk-profile")]
+        public async Task<IActionResult> GetMonkProfile(int id)
+        {
+            if (!CanAccessUserResource(id))
+            {
+                return Forbid();
+            }
+
+            var currentUserId = User.GetCurrentUserId();
+            var response = await _userService.GetMonkProfile(currentUserId ?? 0, id);
+            return response.ToActionResult();
+        }
+
+        [HttpPut("{id}/monk-profile")]
+        public async Task<IActionResult> UpdateMonkProfile(int id, UpdateMonkProfileRequestDto request)
+        {
+            if (!CanAccessUserResource(id))
+            {
+                return Forbid();
+            }
+
+            var currentUserId = User.GetCurrentUserId();
+            var response = await _userService.UpdateMonkProfile(currentUserId ?? 0, id, request);
+            return response.ToActionResult();
+        }
+
+        #endregion
+
+        #region UserSettings
+
+        [HttpGet("{id}/settings")]
+        public async Task<IActionResult> GetUserSettings(int id)
+        {
+            if (!CanAccessUserResource(id))
+            {
+                return Forbid();
+            }
+
+            var currentUserId = User.GetCurrentUserId();
+            var response = await _userService.GetUserSettings(currentUserId ?? 0, id);
+            return response.ToActionResult();
+        }
+
+        [HttpPut("{id}/settings")]
+        public async Task<IActionResult> UpdateUserSettings(int id, UpdateUserSettingRequestDto request)
+        {
+            if (!CanAccessUserResource(id))
+            {
+                return Forbid();
+            }
+
+            var currentUserId = User.GetCurrentUserId();
+            var response = await _userService.UpdateUserSettings(currentUserId ?? 0, id, request);
+            return response.ToActionResult();
+        }
+
+        #endregion
+
         private bool CanAccessUserResource(int targetUserId, string adminPermission = Permissions.Users.View)
         {
             var currentUserId = User.GetCurrentUserId();

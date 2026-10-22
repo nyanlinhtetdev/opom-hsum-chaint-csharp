@@ -21,10 +21,13 @@ namespace HsumChaint.Domain.Features.User.ServiceInterfaces
         Task<PagedResult<NotificationDto>> GetUserNotificationList(int id, PaginationRequest? pagination = null);
 
         Task<Result> DeleteUserNotificationList(int id);
+
+        Task<Result<MonkProfileDto>> GetMonkProfile(int currentUserId, int targetUserId);
+
+        Task<Result<MonkProfileDto>> UpdateMonkProfile(int currentUserId, int targetUserId, UpdateMonkProfileRequestDto request);
+
+        Task<Result<UserSettingDto>> GetUserSettings(int currentUserId, int targetUserId);
+
+        Task<Result<UserSettingDto>> UpdateUserSettings(int currentUserId, int targetUserId, UpdateUserSettingRequestDto request);
     }
 }
-
-
-
-
-

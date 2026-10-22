@@ -19,11 +19,12 @@ public static class SpacePermissions
     public const string DonationReview = "Donation.Review";
     public const string DonationSchedule = "Donation.Schedule";
     public const string DonationCancel = "Donation.Cancel";
+    public const string DonationDelete = "Donation.Delete";
 
     public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(new[]
     {
         SpaceView, SpaceUpdate, SpaceDelete, SpaceTransferOwnership,
         SpaceInviteMember, SpaceUpdateMemberRole, SpaceRemoveMember, SpaceViewMembers,
-        DonationView, DonationCreate, DonationReview, DonationSchedule, DonationCancel
+        DonationView, DonationCreate, DonationReview, DonationSchedule, DonationCancel, DonationDelete
     });
 }
