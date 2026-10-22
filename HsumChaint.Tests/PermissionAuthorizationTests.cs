@@ -63,6 +63,6 @@ public class PermissionAuthorizationTests
             .SingleOrDefault();
 
         Assert.NotNull(attribute);
-        Assert.Equal(Permissions.Monastery.Delete, attribute!.Policy);
+        Assert.Equal(SpacePermissions.SpaceDelete, attribute!.Policy);
     }
 }

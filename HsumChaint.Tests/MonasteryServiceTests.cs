@@ -1,6 +1,10 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using HsumChaint.Database.Models;
 using HsumChaint.Domain.Features.Monastery.DTOs;
 using HsumChaint.Domain.Features.Monastery.Services;
+using HsumChaint.Shared.Authorization;
 using HsumChaint.Shared.CommonEnum;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -10,40 +14,58 @@ namespace HsumChaint.Tests;
 public class MonasteryServiceTests
 {
     [Fact]
-    public async Task CustomRole_ManageMembersPermission_ControlsMembershipOperations()
+    public async Task CustomRole_GranularPermissions_ControlMembershipOperationsSeparately()
     {
         await using var db = CreateDbContext();
-        SeedUser(db, 1, "Owner", "091");
-        SeedUser(db, 2, "Custom Manager", "092");
-        SeedUser(db, 3, "Invitee", "093");
+        SeedUser(db, 1, "Owner", "091", roleId: 2);
+        SeedUser(db, 2, "Custom Actor", "092", roleId: 3);
+        SeedUser(db, 3, "Invitee", "093", roleId: 3);
         SeedMonastery(db, 10, 1);
-        db.Roles.Add(new Role { Id = 20, Name = "Custom Manager" });
-        db.MonasteryMembers.Add(new MonasteryMember { UserId = 2, MonasterySpaceId = 10, RoleId = 20 });
+        var customRole = new SpaceRole { Id = 20, Name = "Custom Actor" };
+        db.SpaceRoles.Add(customRole);
+        db.MonasteryMembers.Add(new MonasteryMember { UserId = 2, MonasterySpaceId = 10, SpaceRoleId = 20, SpaceRole = customRole });
         await db.SaveChangesAsync();
         var service = new MonasteryService(db);
-        var request = new InviteMemberRequestDto { UserId = 3, RoleId = 5 };
+        var request = new InviteMemberRequestDto { UserId = 3, SpaceRoleId = SpaceRoles.ViewerId };
+
+        // 1. Without SpaceInviteMember permission, inviting fails
         Assert.False((await service.InviteMember(2, 10, request)).IsSuccess);
-        var permission = db.Permissions.Single(p => p.Name == "Monastery.ManageMembers");
-        var mapping = new RolePermission { RoleId = 20, PermissionId = permission.Id };
-        db.RolePermissions.Add(mapping);
+
+        // 2. Grant SpaceInviteMember permission only
+        var invitePerm = db.SpacePermissions.Single(p => p.Name == SpacePermissions.SpaceInviteMember);
+        var inviteMapping = new SpaceRolePermission { SpaceRoleId = 20, SpacePermissionId = invitePerm.Id, SpaceRole = customRole, SpacePermission = invitePerm };
+        db.SpaceRolePermissions.Add(inviteMapping);
         await db.SaveChangesAsync();
+
+        // 3. Now invite succeeds
         Assert.True((await service.InviteMember(2, 10, request)).IsSuccess);
         Assert.Equal("Viewer", (await service.RespondToInvitation(3, db.Invitations.Single().Id,
-            new() { Status = InvitationStatus.Accept })).Data!.RoleName);
-        Assert.True((await service.UpdateMemberRole(2, 10, 3, new() { RoleId = 4 })).IsSuccess);
-        Assert.Equal("Editor", (await service.GetMembers(2, 10)).Data!.Single(m => m.UserId == 3).RoleName);
-        mapping.IsDeleted = true;
-        await db.SaveChangesAsync();
+            new() { Status = InvitationStatus.Accept })).Data!.SpaceRoleName);
+
+        // 4. BUT UpdateMemberRole and RemoveMember FAIL because they are separate permissions!
+        Assert.False((await service.UpdateMemberRole(2, 10, 3, new() { SpaceRoleId = SpaceRoles.EditorId })).IsSuccess);
         Assert.False((await service.RemoveMember(2, 10, 3)).IsSuccess);
-        Assert.False((await service.InviteMember(2, 99, request)).IsSuccess);
-        Assert.True((await service.RemoveMember(1, 10, 3)).IsSuccess);
+
+        // 5. Grant SpaceUpdateMemberRole and SpaceRemoveMember permissions
+        var updatePerm = db.SpacePermissions.Single(p => p.Name == SpacePermissions.SpaceUpdateMemberRole);
+        var removePerm = db.SpacePermissions.Single(p => p.Name == SpacePermissions.SpaceRemoveMember);
+        db.SpaceRolePermissions.AddRange(
+            new SpaceRolePermission { SpaceRoleId = 20, SpacePermissionId = updatePerm.Id, SpaceRole = customRole, SpacePermission = updatePerm },
+            new SpaceRolePermission { SpaceRoleId = 20, SpacePermissionId = removePerm.Id, SpaceRole = customRole, SpacePermission = removePerm }
+        );
+        await db.SaveChangesAsync();
+
+        // 6. Now UpdateMemberRole and RemoveMember succeed!
+        Assert.True((await service.UpdateMemberRole(2, 10, 3, new() { SpaceRoleId = SpaceRoles.EditorId })).IsSuccess);
+        Assert.Equal("Editor", (await service.GetMembers(2, 10)).Data!.Single(m => m.UserId == 3).SpaceRoleName);
+        Assert.True((await service.RemoveMember(2, 10, 3)).IsSuccess);
     }
 
     [Fact]
     public async Task CreateMonastery_CreatesOwnerMembership()
     {
         await using var dbContext = CreateDbContext();
-        SeedUser(dbContext, 1, "Owner", "091");
+        SeedUser(dbContext, 1, "Owner", "091", roleId: 2);
         await dbContext.SaveChangesAsync();
         var service = new MonasteryService(dbContext);
 
@@ -55,8 +77,8 @@ public class MonasteryServiceTests
 
         Assert.True(response.IsSuccess);
         Assert.NotNull(response.Data);
-        Assert.Equal(3, response.Data!.CurrentUserRoleId);
-        Assert.Equal("User", response.Data.CurrentUserRoleName);
+        Assert.Equal(SpaceRoles.OwnerId, response.Data!.CurrentUserRoleId);
+        Assert.Equal(SpaceRoles.Owner, response.Data.CurrentUserRoleName);
         Assert.True(dbContext.MonasteryMembers.Single().IsOwner);
     }
 
@@ -64,8 +86,8 @@ public class MonasteryServiceTests
     public async Task InviteMember_CreatesPendingInvitationForExistingUser()
     {
         await using var dbContext = CreateDbContext();
-        SeedUser(dbContext, 1, "Owner", "091");
-        SeedUser(dbContext, 2, "Editor", "092");
+        SeedUser(dbContext, 1, "Owner", "091", roleId: 2);
+        SeedUser(dbContext, 2, "Editor", "092", roleId: 3);
         SeedMonastery(dbContext, 10, 1);
         await dbContext.SaveChangesAsync();
         var service = new MonasteryService(dbContext);
@@ -73,12 +95,12 @@ public class MonasteryServiceTests
         var response = await service.InviteMember(1, 10, new InviteMemberRequestDto
         {
             UserId = 2,
-            RoleId = 4
+            SpaceRoleId = SpaceRoles.EditorId
         });
 
         Assert.True(response.IsSuccess);
         Assert.Equal(InvitationStatus.Pending, response.Data!.Status);
-        Assert.Equal(4, response.Data.RoleId);
+        Assert.Equal(SpaceRoles.EditorId, response.Data.SpaceRoleId);
         Assert.Single(dbContext.Notifications);
     }
 
@@ -86,8 +108,8 @@ public class MonasteryServiceTests
     public async Task RespondToInvitation_Accept_CreatesMember()
     {
         await using var dbContext = CreateDbContext();
-        SeedUser(dbContext, 1, "Owner", "091");
-        SeedUser(dbContext, 2, "Editor", "092");
+        SeedUser(dbContext, 1, "Owner", "091", roleId: 2);
+        SeedUser(dbContext, 2, "Editor", "092", roleId: 3);
         SeedMonastery(dbContext, 10, 1);
         dbContext.Invitations.Add(new Invitation
         {
@@ -95,7 +117,7 @@ public class MonasteryServiceTests
             MonasterySpaceId = 10,
             InvitedUserId = 2,
             InvitedById = 1,
-            RoleId = 4,
+            SpaceRoleId = SpaceRoles.EditorId,
             Status = InvitationStatus.Pending,
             CreatedAt = DateTime.UtcNow
         });
@@ -109,26 +131,26 @@ public class MonasteryServiceTests
 
         Assert.True(response.IsSuccess);
         Assert.Equal(InvitationStatus.Accept, response.Data!.Status);
-        Assert.Contains(dbContext.MonasteryMembers, x => x.UserId == 2 && x.RoleId == 4);
+        Assert.Contains(dbContext.MonasteryMembers, x => x.UserId == 2 && x.SpaceRoleId == SpaceRoles.EditorId);
     }
 
     [Fact]
     public async Task UpdateMemberRole_RejectsViewerActor()
     {
         await using var dbContext = CreateDbContext();
-        SeedUser(dbContext, 1, "Owner", "091");
-        SeedUser(dbContext, 2, "Viewer", "092");
-        SeedUser(dbContext, 3, "Editor", "093");
+        SeedUser(dbContext, 1, "Owner", "091", roleId: 2);
+        SeedUser(dbContext, 2, "Viewer", "092", roleId: 3);
+        SeedUser(dbContext, 3, "Editor", "093", roleId: 3);
         SeedMonastery(dbContext, 10, 1);
         dbContext.MonasteryMembers.AddRange(
-            new MonasteryMember { UserId = 2, MonasterySpaceId = 10, RoleId = 5, IsOwner = false },
-            new MonasteryMember { UserId = 3, MonasterySpaceId = 10, RoleId = 4, IsOwner = false });
+            new MonasteryMember { UserId = 2, MonasterySpaceId = 10, SpaceRoleId = SpaceRoles.ViewerId, IsOwner = false },
+            new MonasteryMember { UserId = 3, MonasterySpaceId = 10, SpaceRoleId = SpaceRoles.EditorId, IsOwner = false });
         await dbContext.SaveChangesAsync();
         var service = new MonasteryService(dbContext);
 
         var response = await service.UpdateMemberRole(2, 10, 3, new UpdateMemberRoleRequestDto
         {
-            RoleId = 1
+            SpaceRoleId = SpaceRoles.AdminId
         });
 
         Assert.False(response.IsSuccess);
@@ -139,8 +161,8 @@ public class MonasteryServiceTests
     public async Task DeleteMonastery_OwnerMonkSucceeds_AndHidesMonasteryFromQueries()
     {
         await using var dbContext = CreateDbContext();
-        SeedUser(dbContext, 1, "Owner Monk", "091");
-        SeedUser(dbContext, 2, "Invitee", "092");
+        SeedUser(dbContext, 1, "Owner Monk", "091", roleId: 2);
+        SeedUser(dbContext, 2, "Invitee", "092", roleId: 3);
         SeedMonastery(dbContext, 10, 1);
         await dbContext.SaveChangesAsync();
         var service = new MonasteryService(dbContext);
@@ -160,7 +182,7 @@ public class MonasteryServiceTests
         var updateResponse = await service.UpdateMonastery(1, 10, new UpdateMonasteryRequestDto { MonasteryName = "Renamed" });
         Assert.False(updateResponse.IsSuccess);
 
-        var inviteResponse = await service.InviteMember(1, 10, new InviteMemberRequestDto { UserId = 2, RoleId = 4 });
+        var inviteResponse = await service.InviteMember(1, 10, new InviteMemberRequestDto { UserId = 2, SpaceRoleId = SpaceRoles.EditorId });
         Assert.False(inviteResponse.IsSuccess);
     }
 
@@ -168,14 +190,14 @@ public class MonasteryServiceTests
     public async Task DeleteMonastery_RejectsNonOwnerAdmin_NonOwnerMonk_AndNonMonkOwner()
     {
         await using var dbContext = CreateDbContext();
-        SeedUser(dbContext, 1, "Owner Monk", "091");
-        SeedUser(dbContext, 2, "Space Admin", "092");
-        SeedUser(dbContext, 3, "Other Monk", "093");
-        SeedUser(dbContext, 4, "NonMonk Owner", "094");
+        SeedUser(dbContext, 1, "Owner Monk", "091", roleId: 2);
+        SeedUser(dbContext, 2, "Space Admin", "092", roleId: 3);
+        SeedUser(dbContext, 3, "Other Monk", "093", roleId: 2);
+        SeedUser(dbContext, 4, "NonMonk Owner", "094", roleId: 3);
         SeedMonastery(dbContext, 10, 1);
         dbContext.MonasteryMembers.AddRange(
-            new MonasteryMember { UserId = 2, MonasterySpaceId = 10, RoleId = 1, IsOwner = false },
-            new MonasteryMember { UserId = 3, MonasterySpaceId = 10, RoleId = 2, IsOwner = false });
+            new MonasteryMember { UserId = 2, MonasterySpaceId = 10, SpaceRoleId = SpaceRoles.AdminId, IsOwner = false },
+            new MonasteryMember { UserId = 3, MonasterySpaceId = 10, SpaceRoleId = SpaceRoles.ViewerId, IsOwner = false });
         dbContext.MonasterySpaces.Add(new MonasterySpace
         {
             Id = 20,
@@ -186,7 +208,7 @@ public class MonasteryServiceTests
         {
             UserId = 4,
             MonasterySpaceId = 20,
-            RoleId = 1,
+            SpaceRoleId = SpaceRoles.OwnerId,
             IsOwner = true
         });
         await dbContext.SaveChangesAsync();
@@ -209,7 +231,7 @@ public class MonasteryServiceTests
     public async Task DeleteMonastery_NonExistentOrAlreadyDeleted_ReturnsNotFoundFailure()
     {
         await using var dbContext = CreateDbContext();
-        SeedUser(dbContext, 1, "Owner Monk", "091");
+        SeedUser(dbContext, 1, "Owner Monk", "091", roleId: 2);
         SeedMonastery(dbContext, 10, 1);
         await dbContext.SaveChangesAsync();
         var service = new MonasteryService(dbContext);
@@ -236,7 +258,7 @@ public class MonasteryServiceTests
         return context;
     }
 
-    private static void SeedUser(AppDbContext dbContext, int id, string name, string phone)
+    private static void SeedUser(AppDbContext dbContext, int id, string name, string phone, int roleId = 2)
     {
         dbContext.Users.Add(new HsumChaint.Database.Models.User
         {
@@ -244,7 +266,7 @@ public class MonasteryServiceTests
             Name = name,
             PhoneNumber = phone,
             Password = "pw",
-            RoleId = 3,
+            RoleId = roleId,
             IsDeleted = false
         });
     }
@@ -261,7 +283,7 @@ public class MonasteryServiceTests
         {
             UserId = ownerUserId,
             MonasterySpaceId = monasteryId,
-            RoleId = 2,
+            SpaceRoleId = SpaceRoles.OwnerId,
             IsOwner = true
         });
     }

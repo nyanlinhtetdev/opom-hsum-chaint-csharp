@@ -2,6 +2,7 @@ using HsumChaint.Database.Models;
 using HsumChaint.Domain.Features.Donation.DTOs;
 using HsumChaint.Domain.Features.Donation.Services;
 using HsumChaint.Domain.Features.Notification.Providers;
+using HsumChaint.Shared.Authorization;
 using HsumChaint.Shared.CommonEnum;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -20,15 +21,18 @@ public class DonationServiceTests
         SeedUser(db, 3, "Donor", "093");
         SeedMonastery(db, 10, 1);
         SeedDonation(db, 100, 10, 3, DonationStatus.PendingReview);
-        db.Roles.Add(new Role { Id = 20, Name = "Custom Reviewer" });
-        db.MonasteryMembers.Add(new MonasteryMember { UserId = 2, MonasterySpaceId = 10, RoleId = 20 });
-        db.RolePermissions.Add(new RolePermission { RoleId = 20, PermissionId = db.Permissions.Single(p => p.Name == "Donation.Review").Id });
+        var spaceRole = new SpaceRole { Id = 20, Name = "Custom Reviewer" };
+        db.SpaceRoles.Add(spaceRole);
+        db.MonasteryMembers.Add(new MonasteryMember { UserId = 2, MonasterySpaceId = 10, SpaceRoleId = 20, SpaceRole = spaceRole });
+        var reviewPerm = db.SpacePermissions.Single(p => p.Name == SpacePermissions.DonationReview);
+        db.SpaceRolePermissions.Add(new SpaceRolePermission { SpaceRoleId = 20, SpacePermissionId = reviewPerm.Id, SpaceRole = spaceRole, SpacePermission = reviewPerm });
         await db.SaveChangesAsync();
         var service = new DonationService(db, Mock.Of<IFirebaseNotificationProvider>());
         Assert.True((await service.ReviewDonation(2, 100, new() { Status = DonationStatus.Accepted })).IsSuccess);
         var schedule = new ScheduleDonationRequestDto { PickupTime = DateTime.UtcNow.AddDays(1) };
         Assert.False((await service.ScheduleDonation(2, 100, schedule)).IsSuccess);
-        db.RolePermissions.Add(new RolePermission { RoleId = 20, PermissionId = db.Permissions.Single(p => p.Name == "Donation.Schedule").Id });
+        var schedPerm = db.SpacePermissions.Single(p => p.Name == SpacePermissions.DonationSchedule);
+        db.SpaceRolePermissions.Add(new SpaceRolePermission { SpaceRoleId = 20, SpacePermissionId = schedPerm.Id, SpaceRole = spaceRole, SpacePermission = schedPerm });
         await db.SaveChangesAsync();
         Assert.True((await service.ScheduleDonation(2, 100, schedule)).IsSuccess);
         SeedDonation(db, 101, 99, 3, DonationStatus.PendingReview);
@@ -36,7 +40,7 @@ public class DonationServiceTests
         Assert.False((await service.ReviewDonation(2, 101, new() { Status = DonationStatus.Accepted })).IsSuccess);
         await service.RequestDonation(3, new() { MonasterySpaceId = 10, DonationType = DonationType.Food, Quantity = 1 });
         Assert.Contains(db.Notifications, n => n.UserId == 2 && n.Message == "A new donation request is waiting for review.");
-        db.Permissions.Single(p => p.Name == "Donation.Review").IsDeleted = true;
+        db.SpacePermissions.Single(p => p.Name == SpacePermissions.DonationReview).IsDeleted = true;
         await db.SaveChangesAsync();
         SeedDonation(db, 200, 10, 3, DonationStatus.PendingReview);
         await db.SaveChangesAsync();
@@ -106,7 +110,7 @@ public class DonationServiceTests
         {
             UserId = 2,
             MonasterySpaceId = 10,
-            RoleId = 5,
+            SpaceRoleId = SpaceRoles.ViewerId,
             IsOwner = false
         });
         await dbContext.SaveChangesAsync();
@@ -165,7 +169,7 @@ public class DonationServiceTests
         {
             UserId = 2,
             MonasterySpaceId = 10,
-            RoleId = 4,
+            SpaceRoleId = SpaceRoles.EditorId,
             IsOwner = false
         });
         SeedDonation(dbContext, 100, 10, 3, DonationStatus.Accepted);
@@ -254,7 +258,7 @@ public class DonationServiceTests
         {
             UserId = ownerUserId,
             MonasterySpaceId = monasteryId,
-            RoleId = 2,
+            SpaceRoleId = SpaceRoles.OwnerId,
             IsOwner = true
         });
     }

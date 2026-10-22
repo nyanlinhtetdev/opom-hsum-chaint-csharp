@@ -95,16 +95,11 @@ public class RolePermissionServiceTests
         Assert.False((await service.GetRoleById(999)).IsSuccess);
     }
 
-    [Theory]
-    [InlineData("user")]
-    [InlineData("member")]
-    [InlineData("invitation")]
-    public async Task DeleteRole_RejectsReferencedRole(string reference)
+    [Fact]
+    public async Task DeleteRole_RejectsReferencedRole()
     {
         await using var db = Context();
-        if (reference == "user") db.Users.Add(new User { Name = "User", PhoneNumber = "091", Password = "pw", RoleId = 3, IsDeleted = false });
-        if (reference == "member") db.MonasteryMembers.Add(new MonasteryMember { RoleId = 3 });
-        if (reference == "invitation") db.Invitations.Add(new Invitation { RoleId = 3, Status = Shared.CommonEnum.InvitationStatus.Pending });
+        db.Users.Add(new User { Name = "User", PhoneNumber = "091", Password = "pw", RoleId = 3, IsDeleted = false });
         await db.SaveChangesAsync();
         Assert.False((await new RolePermissionService(db).DeleteRole(3)).IsSuccess);
         Assert.False(db.Roles.Find(3)!.IsDeleted);
