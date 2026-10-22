@@ -176,14 +176,19 @@ namespace HsumChaint.Domain.Features.Donation.Services
 
             var totalCount = await donations.CountAsync();
             var donationEntities = await donations
-                .OrderByDescending(x => x.CreatedAt)
-                .ThenByDescending(x => x.Id)
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
             var list = donationEntities.Select(MapDonation).ToList();
 
             return PagedResult<DonationDto>.Success(list, new Pagination(pageNumber, pageSize, totalCount), "Donations retrieved successfully.");
+        }
+
+        public Task<Result<DonationDto>> GetDonation(int currentUserId, GetDonationRequestDto request)
+        {
+            return GetDonation(currentUserId, request.Id);
         }
 
         public async Task<Result<DonationDto>> GetDonation(int currentUserId, int donationId)
@@ -200,6 +205,11 @@ namespace HsumChaint.Domain.Features.Donation.Services
             }
 
             return Result<DonationDto>.Success(MapDonation(donation), "Donation retrieved successfully.");
+        }
+
+        public Task<Result<DonationDto>> ReviewDonation(int currentUserId, ReviewDonationRequestDto request)
+        {
+            return ReviewDonation(currentUserId, request.Id, request);
         }
 
         public async Task<Result<DonationDto>> ReviewDonation(int currentUserId, int donationId, ReviewDonationRequestDto request)
@@ -241,6 +251,11 @@ namespace HsumChaint.Domain.Features.Donation.Services
             return Result<DonationDto>.Success(MapDonation(donation), "Donation reviewed successfully.");
         }
 
+        public Task<Result<DonationDto>> ScheduleDonation(int currentUserId, ScheduleDonationRequestDto request)
+        {
+            return ScheduleDonation(currentUserId, request.Id, request);
+        }
+
         public async Task<Result<DonationDto>> ScheduleDonation(int currentUserId, int donationId, ScheduleDonationRequestDto request)
         {
             if (!request.PickupTime.HasValue && !request.DropoffTime.HasValue)
@@ -279,6 +294,11 @@ namespace HsumChaint.Domain.Features.Donation.Services
             return Result<DonationDto>.Success(MapDonation(donation), "Donation scheduled successfully.");
         }
 
+        public Task<Result<DonationDto>> CompleteDonation(int currentUserId, CompleteDonationRequestDto request)
+        {
+            return CompleteDonation(currentUserId, request.Id);
+        }
+
         public async Task<Result<DonationDto>> CompleteDonation(int currentUserId, int donationId)
         {
             var donation = await _dbContext.DonorLists.FindAsync(donationId);
@@ -311,6 +331,11 @@ namespace HsumChaint.Domain.Features.Donation.Services
             return Result<DonationDto>.Success(MapDonation(donation), "Donation completed successfully.");
         }
 
+        public Task<Result<DonationDto>> CancelDonation(int currentUserId, CancelDonationRequestDto request)
+        {
+            return CancelDonation(currentUserId, request.Id);
+        }
+
         public async Task<Result<DonationDto>> CancelDonation(int currentUserId, int donationId)
         {
             var donation = await _dbContext.DonorLists.FindAsync(donationId);
@@ -340,6 +365,363 @@ namespace HsumChaint.Domain.Features.Donation.Services
             }
 
             return Result<DonationDto>.Success(MapDonation(donation), "Donation cancelled successfully.");
+        }
+
+        public async Task<Result<List<DonationDto>>> CreateBatchManualDonations(int currentUserId, CreateBatchDonationRequestDto request)
+        {
+            if (request.MonasterySpaceId <= 0)
+            {
+                return Result<List<DonationDto>>.Failure("Monastery space id is required.");
+            }
+
+            if (request.Donations == null || request.Donations.Count == 0)
+            {
+                return Result<List<DonationDto>>.Failure("At least one donation must be provided.");
+            }
+
+            if (request.Donations.Count > 50)
+            {
+                return Result<List<DonationDto>>.Failure("Batch size cannot exceed 50 donations.");
+            }
+
+            var member = await GetMember(currentUserId, request.MonasterySpaceId);
+            if (!await CanManageDonations(member))
+            {
+                return Result<List<DonationDto>>.Failure("User is not authorized to create donations for this monastery.");
+            }
+
+            var entities = new List<DonationEntity>();
+            var now = DateTime.UtcNow;
+
+            foreach (var item in request.Donations)
+            {
+                item.MonasterySpaceId = request.MonasterySpaceId;
+                var validation = await ValidateDonationRequest(item);
+                if (validation != null)
+                {
+                    return Result<List<DonationDto>>.Failure(validation.Message);
+                }
+
+                var donor = item.DonorId.HasValue
+                    ? await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == item.DonorId.Value && x.IsDeleted == false)
+                    : null;
+
+                if (item.DonorId.HasValue && donor == null)
+                {
+                    return Result<List<DonationDto>>.Failure($"Donor user with id {item.DonorId.Value} not found.");
+                }
+
+                if (!item.DonorId.HasValue && string.IsNullOrWhiteSpace(item.DonorName))
+                {
+                    return Result<List<DonationDto>>.Failure("Donor name is required for manual donations without a donor account.");
+                }
+
+                var initialStatus = item.PickupTime.HasValue || item.DropoffTime.HasValue
+                    ? DonationStatus.Scheduled
+                    : DonationStatus.Accepted;
+
+                var donation = new DonationEntity
+                {
+                    MonasterySpaceId = request.MonasterySpaceId,
+                    DonorId = donor?.Id,
+                    DonorName = donor?.Name ?? item.DonorName,
+                    DonationType = item.DonationType.ToString(),
+                    DonationTypeValue = item.DonationType,
+                    CustomDonationType = item.CustomDonationType,
+                    Note = item.Note,
+                    Amount = item.Amount,
+                    Quantity = item.Quantity,
+                    Status = initialStatus.ToString(),
+                    StatusValue = initialStatus,
+                    ReviewerId = currentUserId,
+                    ReviewedAt = now,
+                    CreatedAt = now,
+                    PickupTime = item.PickupTime,
+                    DropoffTime = item.DropoffTime
+                };
+
+                entities.Add(donation);
+            }
+
+            await _dbContext.DonorLists.AddRangeAsync(entities);
+            await _dbContext.SaveChangesAsync();
+
+            foreach (var d in entities)
+            {
+                if (d.DonorId.HasValue)
+                {
+                    await NotifyUser(d.DonorId.Value, "Your donation has been recorded by the monastery.", d.Id);
+                }
+            }
+
+            var resultList = entities.Select(MapDonation).ToList();
+            return Result<List<DonationDto>>.Success(resultList, $"{resultList.Count} donations created successfully in batch.");
+        }
+
+        public async Task<Result<List<DonationDto>>> RequestRecurringDonation(int currentUserId, CreateRecurringDonationRequestDto request)
+        {
+            var validation = await ValidateRecurringRequest(request);
+            if (validation != null)
+            {
+                return Result<List<DonationDto>>.Failure(validation);
+            }
+
+            var donor = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == currentUserId && x.IsDeleted == false);
+            if (donor == null)
+            {
+                return Result<List<DonationDto>>.Failure("Donor user not found.");
+            }
+
+            var seriesTag = Guid.NewGuid().ToString("N")[..8];
+            var entities = new List<DonationEntity>();
+            var now = DateTime.UtcNow;
+
+            for (int i = 0; i < request.MonthsCount; i++)
+            {
+                var targetMonth = request.StartDate.AddMonths(i);
+                var clampedDay = Math.Min(request.DayOfMonth, DateTime.DaysInMonth(targetMonth.Year, targetMonth.Month));
+                var targetDate = new DateTime(targetMonth.Year, targetMonth.Month, clampedDay, 0, 0, 0, DateTimeKind.Utc);
+
+                DateTime? pickup = request.PickupTimeOfDay.HasValue ? targetDate.Add(request.PickupTimeOfDay.Value) : null;
+                DateTime? dropoff = request.DropoffTimeOfDay.HasValue ? targetDate.Add(request.DropoffTimeOfDay.Value) : null;
+
+                var seriesNote = string.IsNullOrWhiteSpace(request.Note)
+                    ? $"[Series: {seriesTag}] ({i + 1}/{request.MonthsCount})"
+                    : $"[Series: {seriesTag}] ({i + 1}/{request.MonthsCount}) - {request.Note}";
+
+                var donation = new DonationEntity
+                {
+                    MonasterySpaceId = request.MonasterySpaceId,
+                    DonorId = currentUserId,
+                    DonorName = donor.Name,
+                    DonationType = request.DonationType.ToString(),
+                    DonationTypeValue = request.DonationType,
+                    CustomDonationType = request.CustomDonationType,
+                    Note = seriesNote,
+                    Amount = request.Amount,
+                    Quantity = request.Quantity,
+                    Status = DonationStatus.PendingReview.ToString(),
+                    StatusValue = DonationStatus.PendingReview,
+                    CreatedAt = now,
+                    PickupTime = pickup,
+                    DropoffTime = dropoff
+                };
+
+                entities.Add(donation);
+            }
+
+            await _dbContext.DonorLists.AddRangeAsync(entities);
+            await _dbContext.SaveChangesAsync();
+
+            await NotifyMonasteryManagers(request.MonasterySpaceId, $"New recurring donation series ({request.MonthsCount} months) submitted for review.", entities[0].Id);
+
+            var resultList = entities.Select(MapDonation).ToList();
+            return Result<List<DonationDto>>.Success(resultList, $"Recurring donation series of {resultList.Count} donations requested successfully.");
+        }
+
+        public async Task<Result<List<DonationDto>>> CreateManualRecurringDonation(int currentUserId, CreateManualRecurringDonationRequestDto request)
+        {
+            var validation = await ValidateRecurringRequest(request);
+            if (validation != null)
+            {
+                return Result<List<DonationDto>>.Failure(validation);
+            }
+
+            var member = await GetMember(currentUserId, request.MonasterySpaceId);
+            if (!await CanManageDonations(member))
+            {
+                return Result<List<DonationDto>>.Failure("User is not authorized to create manual donations for this monastery.");
+            }
+
+            var donor = request.DonorId.HasValue
+                ? await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == request.DonorId.Value && x.IsDeleted == false)
+                : null;
+
+            if (request.DonorId.HasValue && donor == null)
+            {
+                return Result<List<DonationDto>>.Failure("Donor user not found.");
+            }
+
+            if (!request.DonorId.HasValue && string.IsNullOrWhiteSpace(request.DonorName))
+            {
+                return Result<List<DonationDto>>.Failure("Donor name is required for manual donations without a donor account.");
+            }
+
+            var seriesTag = Guid.NewGuid().ToString("N")[..8];
+            var entities = new List<DonationEntity>();
+            var now = DateTime.UtcNow;
+
+            for (int i = 0; i < request.MonthsCount; i++)
+            {
+                var targetMonth = request.StartDate.AddMonths(i);
+                var clampedDay = Math.Min(request.DayOfMonth, DateTime.DaysInMonth(targetMonth.Year, targetMonth.Month));
+                var targetDate = new DateTime(targetMonth.Year, targetMonth.Month, clampedDay, 0, 0, 0, DateTimeKind.Utc);
+
+                DateTime? pickup = request.PickupTimeOfDay.HasValue ? targetDate.Add(request.PickupTimeOfDay.Value) : null;
+                DateTime? dropoff = request.DropoffTimeOfDay.HasValue ? targetDate.Add(request.DropoffTimeOfDay.Value) : null;
+
+                var initialStatus = pickup.HasValue || dropoff.HasValue ? DonationStatus.Scheduled : DonationStatus.Accepted;
+
+                var seriesNote = string.IsNullOrWhiteSpace(request.Note)
+                    ? $"[Series: {seriesTag}] ({i + 1}/{request.MonthsCount})"
+                    : $"[Series: {seriesTag}] ({i + 1}/{request.MonthsCount}) - {request.Note}";
+
+                var donation = new DonationEntity
+                {
+                    MonasterySpaceId = request.MonasterySpaceId,
+                    DonorId = donor?.Id,
+                    DonorName = donor?.Name ?? request.DonorName,
+                    DonationType = request.DonationType.ToString(),
+                    DonationTypeValue = request.DonationType,
+                    CustomDonationType = request.CustomDonationType,
+                    Note = seriesNote,
+                    Amount = request.Amount,
+                    Quantity = request.Quantity,
+                    Status = initialStatus.ToString(),
+                    StatusValue = initialStatus,
+                    ReviewerId = currentUserId,
+                    ReviewedAt = now,
+                    CreatedAt = now,
+                    PickupTime = pickup,
+                    DropoffTime = dropoff
+                };
+
+                entities.Add(donation);
+            }
+
+            await _dbContext.DonorLists.AddRangeAsync(entities);
+            await _dbContext.SaveChangesAsync();
+
+            if (donor != null)
+            {
+                await NotifyUser(donor.Id, $"A recurring donation series ({request.MonthsCount} months) was recorded for you.", entities[0].Id);
+            }
+
+            var resultList = entities.Select(MapDonation).ToList();
+            return Result<List<DonationDto>>.Success(resultList, $"Recurring donation series of {resultList.Count} donations created successfully.");
+        }
+
+        public Task<Result<bool>> DeleteDonation(int currentUserId, DeleteDonationRequestDto request)
+        {
+            return DeleteDonation(currentUserId, request.Id);
+        }
+
+        public async Task<Result<bool>> DeleteDonation(int currentUserId, int donationId)
+        {
+            var donation = await _dbContext.DonorLists.FindAsync(donationId);
+            if (donation == null)
+            {
+                return Result<bool>.Failure("Donation not found.");
+            }
+
+            var member = await GetMember(currentUserId, donation.MonasterySpaceId ?? 0);
+            if (!await CanManageDonations(member))
+            {
+                return Result<bool>.Failure("User is not authorized to delete donations in this monastery.");
+            }
+
+            if (donation.StatusValue == DonationStatus.Completed)
+            {
+                return Result<bool>.Failure("Completed donations cannot be deleted.");
+            }
+
+            _dbContext.DonorLists.Remove(donation);
+            await _dbContext.SaveChangesAsync();
+
+            return Result<bool>.Success(true, "Donation deleted successfully.");
+        }
+
+        public async Task<Result<MonthlyDonationSummaryDto>> GetMonthlyCalendar(int currentUserId, MonthlyCalendarQueryDto query)
+        {
+            if (query.Year < 2000 || query.Year > 2100)
+            {
+                return Result<MonthlyDonationSummaryDto>.Failure("Invalid year.");
+            }
+
+            if (query.Month < 1 || query.Month > 12)
+            {
+                return Result<MonthlyDonationSummaryDto>.Failure("Invalid month.");
+            }
+
+            var startOfMonth = new DateTime(query.Year, query.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var startOfNextMonth = startOfMonth.AddMonths(1);
+
+            var donationsQuery = _dbContext.DonorLists.AsNoTracking();
+
+            if (query.MonasterySpaceId.HasValue)
+            {
+                var member = await GetMember(currentUserId, query.MonasterySpaceId.Value);
+                if (member == null)
+                {
+                    return Result<MonthlyDonationSummaryDto>.Failure("User is not a member of this monastery.");
+                }
+                donationsQuery = donationsQuery.Where(x => x.MonasterySpaceId == query.MonasterySpaceId.Value);
+            }
+            else
+            {
+                donationsQuery = donationsQuery.Where(x => x.DonorId == currentUserId);
+            }
+
+            if (query.Status.HasValue)
+            {
+                donationsQuery = donationsQuery.Where(x => x.StatusValue == query.Status.Value);
+            }
+
+            donationsQuery = donationsQuery.Where(x =>
+                (x.PickupTime != null && x.PickupTime >= startOfMonth && x.PickupTime < startOfNextMonth) ||
+                (x.PickupTime == null && x.CreatedAt >= startOfMonth && x.CreatedAt < startOfNextMonth)
+            );
+
+            var donations = await donationsQuery
+                .OrderBy(x => x.PickupTime ?? x.CreatedAt)
+                .ToListAsync();
+
+            var summary = new MonthlyDonationSummaryDto
+            {
+                Year = query.Year,
+                Month = query.Month,
+                TotalDonationsCount = donations.Count,
+                TotalAmount = donations.Sum(x => x.Amount ?? 0)
+            };
+
+            var groupedByDay = donations
+                .GroupBy(x => (x.PickupTime ?? x.CreatedAt ?? startOfMonth).Day)
+                .OrderBy(g => g.Key);
+
+            foreach (var group in groupedByDay)
+            {
+                var dayDate = new DateTime(query.Year, query.Month, group.Key, 0, 0, 0, DateTimeKind.Utc);
+                summary.Days.Add(new DailyDonationSummaryDto
+                {
+                    Day = group.Key,
+                    Date = dayDate.ToString("yyyy-MM-dd"),
+                    DonationsCount = group.Count(),
+                    Donations = group.Select(MapDonation).ToList()
+                });
+            }
+
+            return Result<MonthlyDonationSummaryDto>.Success(summary, "Monthly calendar summary retrieved successfully.");
+        }
+
+        private async Task<string?> ValidateRecurringRequest(CreateRecurringDonationRequestDto request)
+        {
+            if (request.MonasterySpaceId <= 0)
+                return "Monastery space id is required.";
+
+            var monasteryExists = await _dbContext.MonasterySpaces.AnyAsync(x => x.Id == request.MonasterySpaceId && !x.IsDeleted);
+            if (!monasteryExists)
+                return "Monastery not found.";
+
+            if (request.DayOfMonth < 1 || request.DayOfMonth > 31)
+                return "Day of month must be between 1 and 31.";
+
+            if (request.MonthsCount < 1 || request.MonthsCount > 24)
+                return "Months count must be between 1 and 24.";
+
+            if (request.DonationType == DonationType.Other && string.IsNullOrWhiteSpace(request.CustomDonationType))
+                return "Custom donation type is required when donation type is Other.";
+
+            return null;
         }
 
         private async Task<Result<DonationDto>?> ValidateDonationRequest(CreateDonationRequestDto request)

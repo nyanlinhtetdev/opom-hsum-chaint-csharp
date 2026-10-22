@@ -72,7 +72,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.GetDonation(currentUserId.Value, id);
+            var request = new GetDonationRequestDto { Id = id };
+            var response = await _donationService.GetDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -86,7 +87,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.ReviewDonation(currentUserId.Value, id, request);
+            request.Id = id;
+            var response = await _donationService.ReviewDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -100,7 +102,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.ScheduleDonation(currentUserId.Value, id, request);
+            request.Id = id;
+            var response = await _donationService.ScheduleDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -114,7 +117,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.CompleteDonation(currentUserId.Value, id);
+            var request = new CompleteDonationRequestDto { Id = id };
+            var response = await _donationService.CompleteDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -128,9 +132,80 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.CancelDonation(currentUserId.Value, id);
+            var request = new CancelDonationRequestDto { Id = id };
+            var response = await _donationService.CancelDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
+        [HttpPost("batch")]
+        [HasPermission(Permissions.Donation.Create)]
+        public async Task<IActionResult> CreateBatchDonations(CreateBatchDonationRequestDto request)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var response = await _donationService.CreateBatchManualDonations(currentUserId.Value, request);
+            return response.ToActionResult();
+        }
+
+        [HttpPost("recurring/request")]
+        [HasPermission(Permissions.Donation.Create)]
+        public async Task<IActionResult> RequestRecurringDonation(CreateRecurringDonationRequestDto request)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var response = await _donationService.RequestRecurringDonation(currentUserId.Value, request);
+            return response.ToActionResult();
+        }
+
+        [HttpPost("recurring/manual")]
+        [HasPermission(Permissions.Donation.Create)]
+        public async Task<IActionResult> CreateManualRecurringDonation(CreateManualRecurringDonationRequestDto request)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var response = await _donationService.CreateManualRecurringDonation(currentUserId.Value, request);
+            return response.ToActionResult();
+        }
+
+        [HttpDelete("{id}")]
+        [HasPermission(Permissions.Donation.Delete)]
+        public async Task<IActionResult> DeleteDonation(int id)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var request = new DeleteDonationRequestDto { Id = id };
+            var response = await _donationService.DeleteDonation(currentUserId.Value, request);
+            return response.ToActionResult();
+        }
+
+        [HttpGet("calendar")]
+        [HasPermission(Permissions.Donation.View)]
+        public async Task<IActionResult> GetMonthlyCalendar([FromQuery] MonthlyCalendarQueryDto query)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var response = await _donationService.GetMonthlyCalendar(currentUserId.Value, query);
+            return response.ToActionResult();
+        }
     }
 }

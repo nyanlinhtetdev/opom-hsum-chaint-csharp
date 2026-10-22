@@ -23,7 +23,20 @@ public class CreateRoleRequestDto
     public List<int> PermissionIds { get; set; } = new();
 }
 
-public class UpdateRoleRequestDto : CreateRoleRequestDto { }
+public class GetRoleRequestDto
+{
+    public int Id { get; set; }
+}
+
+public class DeleteRoleRequestDto
+{
+    public int Id { get; set; }
+}
+
+public class UpdateRoleRequestDto : CreateRoleRequestDto
+{
+    public int Id { get; set; }
+}
 
 public class AssignRolePermissionsRequestDto
 {

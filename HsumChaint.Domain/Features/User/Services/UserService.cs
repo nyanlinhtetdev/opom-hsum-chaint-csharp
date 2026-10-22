@@ -223,6 +223,179 @@ namespace HsumChaint.Domain.Features.User.Services
         }
         #endregion
 
+        #region MonkProfile
+        public async Task<Result<MonkProfileDto>> GetMonkProfile(int currentUserId, int targetUserId)
+        {
+            try
+            {
+                var targetUser = await _context.Users.Include(u => u.Role).AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == targetUserId && u.IsDeleted == false);
+                if (targetUser == null)
+                {
+                    return Result<MonkProfileDto>.Failure("User not found.");
+                }
+
+                if (targetUser.Role == null || !string.Equals(targetUser.Role.Name, "Monk", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Result<MonkProfileDto>.Failure("User is not a monk.");
+                }
+
+                var profile = await _context.MonkProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == targetUserId);
+                var dto = new MonkProfileDto
+                {
+                    Id = profile?.Id ?? 0,
+                    UserId = targetUserId,
+                    MonasteryName = profile?.MonasteryName,
+                    MonasteryAddress = profile?.MonasteryAddress
+                };
+
+                return Result<MonkProfileDto>.Success(dto, "Monk profile retrieved successfully.");
+            }
+            catch (Exception ex)
+            {
+                return Result<MonkProfileDto>.Failure($"Application Layer Exception: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<MonkProfileDto>> UpdateMonkProfile(int currentUserId, int targetUserId, UpdateMonkProfileRequestDto request)
+        {
+            try
+            {
+                var targetUser = await _context.Users.Include(u => u.Role)
+                    .FirstOrDefaultAsync(u => u.Id == targetUserId && u.IsDeleted == false);
+                if (targetUser == null)
+                {
+                    return Result<MonkProfileDto>.Failure("User not found.");
+                }
+
+                if (targetUser.Role == null || !string.Equals(targetUser.Role.Name, "Monk", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Result<MonkProfileDto>.Failure("User is not a monk.");
+                }
+
+                var profile = await _context.MonkProfiles.FirstOrDefaultAsync(p => p.UserId == targetUserId);
+                if (profile == null)
+                {
+                    profile = new MonkProfile
+                    {
+                        UserId = targetUserId,
+                        MonasteryName = request.MonasteryName,
+                        MonasteryAddress = request.MonasteryAddress
+                    };
+                    await _context.MonkProfiles.AddAsync(profile);
+                }
+                else
+                {
+                    profile.MonasteryName = request.MonasteryName;
+                    profile.MonasteryAddress = request.MonasteryAddress;
+                    _context.MonkProfiles.Update(profile);
+                }
+
+                await _context.SaveChangesAsync();
+
+                var dto = new MonkProfileDto
+                {
+                    Id = profile.Id,
+                    UserId = targetUserId,
+                    MonasteryName = profile.MonasteryName,
+                    MonasteryAddress = profile.MonasteryAddress
+                };
+
+                return Result<MonkProfileDto>.Success(dto, "Monk profile updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return Result<MonkProfileDto>.Failure($"Application Layer Exception: {ex.Message}");
+            }
+        }
+        #endregion
+
+        #region UserSettings
+        public async Task<Result<UserSettingDto>> GetUserSettings(int currentUserId, int targetUserId)
+        {
+            try
+            {
+                var targetUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == targetUserId && u.IsDeleted == false);
+                if (targetUser == null)
+                {
+                    return Result<UserSettingDto>.Failure("User not found.");
+                }
+
+                var setting = await _context.UserSettings.AsNoTracking().FirstOrDefaultAsync(s => s.UserId == targetUserId);
+
+                var today = DateTime.UtcNow.Date;
+                var defaultPickupNoti = today.AddHours(15).AddMinutes(30);
+                var defaultDropoffNoti = today.AddHours(22);
+
+                var dto = new UserSettingDto
+                {
+                    UserId = targetUserId,
+                    PickupNotificationTime = setting?.PickupNotificationTime ?? defaultPickupNoti,
+                    DropoffNotificationTime = setting?.DropoffNotificationTime ?? defaultDropoffNoti,
+                    PickupTime = setting?.PickupTime,
+                    DropoffTime = setting?.DropoffTime
+                };
+
+                return Result<UserSettingDto>.Success(dto, "User settings retrieved successfully.");
+            }
+            catch (Exception ex)
+            {
+                return Result<UserSettingDto>.Failure($"Application Layer Exception: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<UserSettingDto>> UpdateUserSettings(int currentUserId, int targetUserId, UpdateUserSettingRequestDto request)
+        {
+            try
+            {
+                var targetUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == targetUserId && u.IsDeleted == false);
+                if (targetUser == null)
+                {
+                    return Result<UserSettingDto>.Failure("User not found.");
+                }
+
+                var setting = await _context.UserSettings.FirstOrDefaultAsync(s => s.UserId == targetUserId);
+                if (setting == null)
+                {
+                    setting = new UserSetting
+                    {
+                        UserId = targetUserId,
+                        PickupNotificationTime = request.PickupNotificationTime,
+                        DropoffNotificationTime = request.DropoffNotificationTime,
+                        PickupTime = request.PickupTime,
+                        DropoffTime = request.DropoffTime
+                    };
+                    await _context.UserSettings.AddAsync(setting);
+                }
+                else
+                {
+                    setting.PickupNotificationTime = request.PickupNotificationTime;
+                    setting.DropoffNotificationTime = request.DropoffNotificationTime;
+                    setting.PickupTime = request.PickupTime;
+                    setting.DropoffTime = request.DropoffTime;
+                    _context.UserSettings.Update(setting);
+                }
+
+                await _context.SaveChangesAsync();
+
+                var dto = new UserSettingDto
+                {
+                    UserId = targetUserId,
+                    PickupNotificationTime = setting.PickupNotificationTime,
+                    DropoffNotificationTime = setting.DropoffNotificationTime,
+                    PickupTime = setting.PickupTime,
+                    DropoffTime = setting.DropoffTime
+                };
+
+                return Result<UserSettingDto>.Success(dto, "User settings updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                return Result<UserSettingDto>.Failure($"Application Layer Exception: {ex.Message}");
+            }
+        }
+        #endregion
+
         private static UserEntity MapToEntity(UserDto dto)
         {
             return new UserEntity
@@ -305,5 +478,24 @@ namespace HsumChaint.Domain.Features.User.Services
 
             return true;
         }
+    
+        public Task<Result<UserDto>> GetUser(GetUserRequestDto request) => GetUser(request.Id);
+        public Task<Result> DeleteUser(DeleteUserRequestDto request) => DeleteUser(request.Id);
+        public Task<PagedResult<InvitationDto>> GetUserInvitationList(GetUserInvitationsRequestDto request) =>
+            GetUserInvitationList(request.Id, new PaginationRequest { PageNumber = request.PageNumber, PageSize = request.PageSize });
+        public Task<PagedResult<InvitationDto>> GetInvitedByOtherList(GetInvitedByOtherRequestDto request) =>
+            GetInvitedByOtherList(request.Id, new PaginationRequest { PageNumber = request.PageNumber, PageSize = request.PageSize });
+        public Task<PagedResult<NotificationDto>> GetUserNotificationList(GetUserNotificationsRequestDto request) =>
+            GetUserNotificationList(request.Id, new PaginationRequest { PageNumber = request.PageNumber, PageSize = request.PageSize });
+        public Task<Result> DeleteUserNotificationList(DeleteUserNotificationsRequestDto request) =>
+            DeleteUserNotificationList(request.Id);
+        public Task<Result<MonkProfileDto>> GetMonkProfile(int currentUserId, GetMonkProfileRequestDto request) =>
+            GetMonkProfile(currentUserId, request.UserId);
+        public Task<Result<MonkProfileDto>> UpdateMonkProfile(int currentUserId, UpdateMonkProfileRequestDto request) =>
+            UpdateMonkProfile(currentUserId, request.UserId, request);
+        public Task<Result<UserSettingDto>> GetUserSettings(int currentUserId, GetUserSettingsRequestDto request) =>
+            GetUserSettings(currentUserId, request.UserId);
+        public Task<Result<UserSettingDto>> UpdateUserSettings(int currentUserId, UpdateUserSettingRequestDto request) =>
+            UpdateUserSettings(currentUserId, request.UserId, request);
     }
 }

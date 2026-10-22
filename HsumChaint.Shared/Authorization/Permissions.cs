@@ -39,6 +39,7 @@ public static class Permissions
         public const string Review = "Donation.Review";
         public const string Schedule = "Donation.Schedule";
         public const string Cancel = "Donation.Cancel";
+        public const string Delete = "Donation.Delete";
     }
 
     public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(new[]
@@ -48,6 +49,6 @@ public static class Permissions
         Invitation.View, Invitation.Respond,
         Notification.View, Notification.Manage,
         Monastery.Create, Monastery.View, Monastery.Update, Monastery.Delete, Monastery.ManageMembers,
-        Donation.View, Donation.Create, Donation.Review, Donation.Schedule, Donation.Cancel
+        Donation.View, Donation.Create, Donation.Review, Donation.Schedule, Donation.Cancel, Donation.Delete
     });
 }
