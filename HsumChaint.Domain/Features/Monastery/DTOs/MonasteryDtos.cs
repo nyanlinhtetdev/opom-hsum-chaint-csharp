@@ -32,7 +32,7 @@ namespace HsumChaint.Domain.Features.Monastery.DTOs
     {
         public int? UserId { get; set; }
         public string? PhoneNumber { get; set; }
-        public int RoleId { get; set; }
+        public int SpaceRoleId { get; set; }
     }
 
     public class InvitationResponseDto
@@ -41,8 +41,8 @@ namespace HsumChaint.Domain.Features.Monastery.DTOs
         public int MonasterySpaceId { get; set; }
         public int InvitedUserId { get; set; }
         public int InvitedById { get; set; }
-        public int RoleId { get; set; }
-        public string? RoleName { get; set; }
+        public int SpaceRoleId { get; set; }
+        public string? SpaceRoleName { get; set; }
         public InvitationStatus Status { get; set; }
         public DateTime? CreatedAt { get; set; }
     }
@@ -59,13 +59,13 @@ namespace HsumChaint.Domain.Features.Monastery.DTOs
         public string? UserName { get; set; }
         public string? PhoneNumber { get; set; }
         public int MonasterySpaceId { get; set; }
-        public int RoleId { get; set; }
-        public string? RoleName { get; set; }
+        public int SpaceRoleId { get; set; }
+        public string? SpaceRoleName { get; set; }
         public bool IsOwner { get; set; }
     }
 
     public class UpdateMemberRoleRequestDto
     {
-        public int RoleId { get; set; }
+        public int SpaceRoleId { get; set; }
     }
 }
