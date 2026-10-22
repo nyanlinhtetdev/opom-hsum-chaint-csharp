@@ -37,7 +37,7 @@ public class AuthServiceTests
         await db.SaveChangesAsync();
         var refreshed = await service.RefreshTokens(new() { UserId = user.Id, RefreshToken = login.Data.RefreshToken });
         Assert.True(refreshed.IsSuccess);
-        Assert.Equal(13, refreshed.Data!.Permissions.Count);
+        Assert.Equal(HsumChaint.Shared.Authorization.Permissions.All.Count - 2, refreshed.Data!.Permissions.Count);
         Assert.DoesNotContain("Roles.View", refreshed.Data.Permissions);
         Assert.DoesNotContain("Roles.Manage", refreshed.Data.Permissions);
         jwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(refreshed.Data.AccessToken);

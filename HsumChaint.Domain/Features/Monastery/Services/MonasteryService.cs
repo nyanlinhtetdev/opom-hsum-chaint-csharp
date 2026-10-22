@@ -10,14 +10,11 @@ using UserEntity = HsumChaint.Database.Models.User;
 
 namespace HsumChaint.Domain.Features.Monastery.Services
 {
-    public class MonasteryService : IMonasteryService
+    public class MonasteryService(AppDbContext dbContext) : IMonasteryService
     {
-        private readonly AppDbContext _dbContext;
+        private readonly AppDbContext _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
 
-        public MonasteryService(AppDbContext dbContext)
-        {
-            _dbContext = dbContext;
-        }
+        private IQueryable<MonasterySpace> ActiveMonasteries => _dbContext.MonasterySpaces.Where(x => !x.IsDeleted);
 
         public async Task<Result<MonasterySpaceDto>> CreateMonastery(int currentUserId, CreateMonasteryRequestDto request)
         {
@@ -31,6 +28,13 @@ namespace HsumChaint.Domain.Features.Monastery.Services
             {
                 return Result<MonasterySpaceDto>.Failure("User or active role not found.");
             }
+
+            if (!string.Equals(creator.Role.Name, "Monk", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(creator.Role.Name, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result<MonasterySpaceDto>.Failure("Only monks can create a monastery space.");
+            }
+
             var monastery = new MonasterySpace
             {
                 MonasteryName = request.MonasteryName,
@@ -39,31 +43,31 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                 CreatedById = currentUserId
             };
 
-            await _dbContext.MonasterySpaces.AddAsync(monastery);
-            await _dbContext.SaveChangesAsync();
-
-            await _dbContext.MonasteryMembers.AddAsync(new MonasteryMember
+            var member = new MonasteryMember
             {
                 UserId = currentUserId,
-                MonasterySpaceId = monastery.Id,
-                RoleId = creator.RoleId,
+                MonasterySpace = monastery,
+                SpaceRoleId = SpaceRoles.OwnerId,
                 IsOwner = true
-            });
+            };
+
+            await _dbContext.MonasterySpaces.AddAsync(monastery);
+            await _dbContext.MonasteryMembers.AddAsync(member);
             await _dbContext.SaveChangesAsync();
 
-            return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, creator.RoleId, creator.Role.Name, true), "Monastery created successfully.");
+            return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, SpaceRoles.OwnerId, SpaceRoles.Owner, true), "Monastery created successfully.");
         }
 
         public async Task<Result<MonasterySpaceDto>> UpdateMonastery(int currentUserId, int monasterySpaceId, UpdateMonasteryRequestDto request)
         {
             var member = await GetMember(currentUserId, monasterySpaceId);
 
-            if (!await CanManageMonastery(member))
+            if (!await HasPermissionTo(currentUserId, member, SpacePermissions.SpaceUpdate))
             {
                 return Result<MonasterySpaceDto>.Failure("User is not authorized to manage this monastery.");
             }
 
-            var monastery = await _dbContext.MonasterySpaces.FindAsync(monasterySpaceId);
+            var monastery = await ActiveMonasteries.FirstOrDefaultAsync(x => x.Id == monasterySpaceId);
             if (monastery == null)
             {
                 return Result<MonasterySpaceDto>.Failure("Monastery not found.");
@@ -74,28 +78,44 @@ namespace HsumChaint.Domain.Features.Monastery.Services
             monastery.Address = request.Address;
             await _dbContext.SaveChangesAsync();
 
-            return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, member!.RoleId, member.Role?.Name, member.IsOwner == true), "Monastery updated successfully.");
+            return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, member!.SpaceRoleId, member.SpaceRole?.Name, member.IsOwner == true), "Monastery updated successfully.");
+        }
+
+        public async Task<Result<bool>> DeleteMonastery(int currentUserId, int monasterySpaceId)
+        {
+            var monastery = await ActiveMonasteries.FirstOrDefaultAsync(x => x.Id == monasterySpaceId);
+            if (monastery == null)
+            {
+                return Result<bool>.Failure("Monastery not found.");
+            }
+
+            var member = await GetMember(currentUserId, monasterySpaceId);
+            if (!await CanDeleteMonastery(member))
+            {
+                return Result<bool>.Failure("User is not authorized to delete this monastery. Only the monastery owner (Monk) can delete the space.");
+            }
+
+            monastery.IsDeleted = true;
+            await _dbContext.SaveChangesAsync();
+
+            return Result<bool>.Success(true, "Monastery deleted successfully.");
         }
 
         public async Task<Result<MonasterySpaceDto>> GetMonastery(int currentUserId, int monasterySpaceId)
         {
             var member = await GetMember(currentUserId, monasterySpaceId);
-
             if (member == null)
             {
-                return Result<MonasterySpaceDto>.Failure("User is not a member of this monastery.");
+                return Result<MonasterySpaceDto>.Failure("Monastery not found.");
             }
 
-            var monastery = await _dbContext.MonasterySpaces
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == monasterySpaceId);
-
+            var monastery = await ActiveMonasteries.FirstOrDefaultAsync(x => x.Id == monasterySpaceId);
             if (monastery == null)
             {
                 return Result<MonasterySpaceDto>.Failure("Monastery not found.");
             }
 
-            return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, member.RoleId, member.Role?.Name, member.IsOwner == true), "Monastery retrieved successfully.");
+            return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, member.SpaceRoleId, member.SpaceRole?.Name, member.IsOwner == true), "Monastery retrieved successfully.");
         }
 
         public async Task<PagedResult<MonasterySpaceDto>> GetMyMonasteries(int currentUserId, PaginationRequest? pagination = null)
@@ -109,7 +129,7 @@ namespace HsumChaint.Domain.Features.Monastery.Services
 
             var query = (
                 from member in _dbContext.MonasteryMembers.AsNoTracking()
-                join monastery in _dbContext.MonasterySpaces.AsNoTracking()
+                join monastery in ActiveMonasteries.AsNoTracking()
                     on member.MonasterySpaceId equals monastery.Id
                 where member.UserId == currentUserId
                 select new MonasterySpaceDto
@@ -119,8 +139,8 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                     Description = monastery.Description,
                     Address = monastery.Address,
                     CreatedById = monastery.CreatedById,
-                    CurrentUserRoleId = member.RoleId,
-                    CurrentUserRoleName = member.Role != null ? member.Role.Name : null,
+                    CurrentUserRoleId = member.SpaceRoleId,
+                    CurrentUserRoleName = member.SpaceRole != null ? member.SpaceRole.Name : null,
                     IsOwner = member.IsOwner == true
                 });
 
@@ -134,12 +154,18 @@ namespace HsumChaint.Domain.Features.Monastery.Services
         {
             var inviter = await GetMember(currentUserId, monasterySpaceId);
 
-            if (!await CanManageMonastery(inviter))
+            if (!await HasPermissionTo(currentUserId, inviter, SpacePermissions.SpaceInviteMember))
             {
                 return Result<InvitationResponseDto>.Failure("User is not authorized to invite monastery members.");
             }
 
-            if (!await _dbContext.Roles.AnyAsync(r => r.Id == request.RoleId && !r.IsDeleted))
+            if (request.SpaceRoleId == SpaceRoles.OwnerId)
+            {
+                return Result<InvitationResponseDto>.Failure("Cannot invite a member as Owner.");
+            }
+
+            var spaceRole = await _dbContext.SpaceRoles.FirstOrDefaultAsync(r => r.Id == request.SpaceRoleId && !r.IsDeleted);
+            if (spaceRole == null)
             {
                 return Result<InvitationResponseDto>.Failure("Role not found.");
             }
@@ -176,8 +202,8 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                 MonasterySpaceId = monasterySpaceId,
                 InvitedUserId = invitedUser.Id,
                 InvitedById = currentUserId,
-                RoleId = request.RoleId,
-                Role = await _dbContext.Roles.FindAsync(request.RoleId),
+                SpaceRoleId = request.SpaceRoleId,
+                SpaceRole = spaceRole,
                 Status = InvitationStatus.Pending,
                 CreatedAt = DateTime.UtcNow
             };
@@ -196,7 +222,7 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                 return Result<InvitationResponseDto>.Failure("Invitation response must be Accept or Reject.");
             }
 
-            var invitation = await _dbContext.Invitations.Include(i => i.Role).FirstOrDefaultAsync(i => i.Id == invitationId);
+            var invitation = await _dbContext.Invitations.Include(i => i.SpaceRole).FirstOrDefaultAsync(i => i.Id == invitationId);
             if (invitation == null)
             {
                 return Result<InvitationResponseDto>.Failure("Invitation not found.");
@@ -216,7 +242,7 @@ namespace HsumChaint.Domain.Features.Monastery.Services
 
             if (request.Status == InvitationStatus.Accept)
             {
-                if (invitation.Role == null || invitation.Role.IsDeleted)
+                if (invitation.SpaceRole == null || invitation.SpaceRole.IsDeleted)
                 {
                     invitation.Status = InvitationStatus.Pending;
                     return Result<InvitationResponseDto>.Failure("Invitation role is inactive or not found.");
@@ -228,7 +254,7 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                     {
                         UserId = currentUserId,
                         MonasterySpaceId = invitation.MonasterySpaceId,
-                        RoleId = invitation.RoleId,
+                        SpaceRoleId = invitation.SpaceRoleId,
                         IsOwner = false
                     });
                 }
@@ -251,7 +277,10 @@ namespace HsumChaint.Domain.Features.Monastery.Services
             }
 
             var member = await GetMember(currentUserId, monasterySpaceId);
-            if (member == null) return PagedResult<MonasteryMemberDto>.Failure("User is not a member of this monastery.");
+            if (!await HasPermissionTo(currentUserId, member, SpacePermissions.SpaceViewMembers))
+            {
+                return PagedResult<MonasteryMemberDto>.Failure("User is not authorized to view members of this monastery.");
+            }
             var query = from membership in _dbContext.MonasteryMembers.AsNoTracking()
                         join user in _dbContext.Users.AsNoTracking() on membership.UserId equals user.Id
                         where membership.MonasterySpaceId == monasterySpaceId
@@ -262,8 +291,8 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                             UserName = user.Name,
                             PhoneNumber = user.PhoneNumber,
                             MonasterySpaceId = membership.MonasterySpaceId ?? 0,
-                            RoleId = membership.RoleId,
-                            RoleName = membership.Role != null ? membership.Role.Name : null,
+                            SpaceRoleId = membership.SpaceRoleId,
+                            SpaceRoleName = membership.SpaceRole != null ? membership.SpaceRole.Name : null,
                             IsOwner = membership.IsOwner == true
                         };
             var totalCount = await query.CountAsync();
@@ -276,12 +305,17 @@ namespace HsumChaint.Domain.Features.Monastery.Services
         {
             var actor = await GetMember(currentUserId, monasterySpaceId);
 
-            if (!await CanManageMonastery(actor))
+            if (!await HasPermissionTo(currentUserId, actor, SpacePermissions.SpaceUpdateMemberRole))
             {
                 return Result<MonasteryMemberDto>.Failure("User is not authorized to manage monastery members.");
             }
 
-            if (!await _dbContext.Roles.AnyAsync(r => r.Id == request.RoleId && !r.IsDeleted))
+            if (request.SpaceRoleId == SpaceRoles.OwnerId)
+            {
+                return Result<MonasteryMemberDto>.Failure("Cannot promote a member to Owner.");
+            }
+
+            if (!await _dbContext.SpaceRoles.AnyAsync(r => r.Id == request.SpaceRoleId && !r.IsDeleted))
             {
                 return Result<MonasteryMemberDto>.Failure("Role not found.");
             }
@@ -297,7 +331,7 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                 return Result<MonasteryMemberDto>.Failure("Owner member role cannot be changed.");
             }
 
-            member.RoleId = request.RoleId;
+            member.SpaceRoleId = request.SpaceRoleId;
             await _dbContext.SaveChangesAsync();
 
             return Result<MonasteryMemberDto>.Success((await GetMemberDtos(monasterySpaceId)).First(x => x.UserId == memberUserId), "Member role updated successfully.");
@@ -307,7 +341,7 @@ namespace HsumChaint.Domain.Features.Monastery.Services
         {
             var actor = await GetMember(currentUserId, monasterySpaceId);
 
-            if (!await CanManageMonastery(actor))
+            if (!await HasPermissionTo(currentUserId, actor, SpacePermissions.SpaceRemoveMember))
             {
                 return Result<MonasteryMemberDto>.Failure("User is not authorized to remove monastery members.");
             }
@@ -332,8 +366,10 @@ namespace HsumChaint.Domain.Features.Monastery.Services
 
         private async Task<MonasteryMember?> GetMember(int userId, int monasterySpaceId)
         {
-            return await _dbContext.MonasteryMembers.Include(m => m.Role)
-                .FirstOrDefaultAsync(x => x.UserId == userId && x.MonasterySpaceId == monasterySpaceId);
+            return await _dbContext.MonasteryMembers.Include(m => m.SpaceRole)
+                .FirstOrDefaultAsync(x => x.UserId == userId
+                    && x.MonasterySpaceId == monasterySpaceId
+                    && _dbContext.MonasterySpaces.Any(s => s.Id == monasterySpaceId && !s.IsDeleted));
         }
 
         private async Task<List<MonasteryMemberDto>> GetMemberDtos(int monasterySpaceId)
@@ -350,8 +386,8 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                     UserName = user.Name,
                     PhoneNumber = user.PhoneNumber,
                     MonasterySpaceId = member.MonasterySpaceId ?? 0,
-                    RoleId = member.RoleId,
-                    RoleName = member.Role != null ? member.Role.Name : null,
+                    SpaceRoleId = member.SpaceRoleId,
+                    SpaceRoleName = member.SpaceRole != null ? member.SpaceRole.Name : null,
                     IsOwner = member.IsOwner == true
                 }).ToListAsync();
         }
@@ -384,9 +420,22 @@ namespace HsumChaint.Domain.Features.Monastery.Services
             });
         }
 
-        private async Task<bool> CanManageMonastery(MonasteryMember? member)
+        private async Task<bool> HasPermissionTo(int currentUserId, MonasteryMember? member, string permissionName)
         {
-            return member is not null && (member.IsOwner == true || await _dbContext.RolePermissions.AnyAsync(rp => rp.RoleId == member.RoleId && !rp.IsDeleted && !rp.Role.IsDeleted && !rp.Permission.IsDeleted && rp.Permission.Name == Permissions.Monastery.ManageMembers));
+            if (member is not null && (member.IsOwner == true || await _dbContext.SpaceRolePermissions.AnyAsync(srp => srp.SpaceRoleId == member.SpaceRoleId && !srp.IsDeleted && !srp.SpaceRole.IsDeleted && !srp.SpacePermission.IsDeleted && srp.SpacePermission.Name == permissionName)))
+            {
+                return true;
+            }
+
+            var user = await _dbContext.Users.Include(u => u.Role).AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId && u.IsDeleted == false);
+            return user?.Role != null && !user.Role.IsDeleted && string.Equals(user.Role.Name, "Admin", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private async Task<bool> CanDeleteMonastery(MonasteryMember? member)
+        {
+            if (member == null || member.IsOwner != true) return false;
+            var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == member.UserId && u.IsDeleted != true);
+            return user != null && (user.RoleId == 1 || user.RoleId == 2);
         }
 
         private static MonasterySpaceDto MapMonastery(MonasterySpace monastery, int? roleId, string? roleName, bool isOwner)
@@ -412,8 +461,8 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                 MonasterySpaceId = invitation.MonasterySpaceId ?? 0,
                 InvitedUserId = invitation.InvitedUserId ?? 0,
                 InvitedById = invitation.InvitedById ?? 0,
-                RoleId = invitation.RoleId,
-                RoleName = invitation.Role?.Name,
+                SpaceRoleId = invitation.SpaceRoleId,
+                SpaceRoleName = invitation.SpaceRole?.Name,
                 Status = invitation.Status,
                 CreatedAt = invitation.CreatedAt
             };

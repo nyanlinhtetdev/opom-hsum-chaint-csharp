@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using HsumChaint.Database.Models;
 using HsumChaint.Shared.Configuration;
 using System.Text;
+using System.Linq;
 
 namespace HsumChaint.API.Extensions;
 
@@ -18,10 +19,11 @@ public static class DependencyInjectionExtensions
     public static IServiceCollection AddApiServices(this IServiceCollection services)
     {
         services.AddControllers();
-        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddAuthorization(options =>
         {
-            foreach (var permission in Permissions.All)
+            foreach (var permission in Permissions.All.Concat(SpacePermissions.All))
                 options.AddPolicy(permission, policy => policy.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(permission)));
         });
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -56,7 +58,7 @@ public static class DependencyInjectionExtensions
             });
         }
 
-            return builder;
+        return builder;
     }
 
     public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)

@@ -14,9 +14,15 @@ public partial class Invitation
 
     public int? InvitedById { get; set; }
 
-    public int RoleId { get; set; }
+    public int SpaceRoleId { get; set; }
 
-    public virtual Role? Role { get; set; }
+    public virtual SpaceRole? SpaceRole { get; set; }
+
+    public virtual MonasterySpace? MonasterySpace { get; set; }
+
+    public virtual User? InvitedUser { get; set; }
+
+    public virtual User? InvitedBy { get; set; }
 
     public InvitationStatus Status { get; set; }
 

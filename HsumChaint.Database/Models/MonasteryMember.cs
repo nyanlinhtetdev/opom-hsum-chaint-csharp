@@ -11,9 +11,13 @@ public partial class MonasteryMember
 
     public int? MonasterySpaceId { get; set; }
 
-    public int RoleId { get; set; }
+    public int SpaceRoleId { get; set; }
 
     public bool? IsOwner { get; set; }
 
-    public virtual Role? Role { get; set; }
+    public virtual SpaceRole? SpaceRole { get; set; }
+
+    public virtual User? User { get; set; }
+
+    public virtual MonasterySpace? MonasterySpace { get; set; }
 }

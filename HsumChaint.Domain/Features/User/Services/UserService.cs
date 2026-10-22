@@ -125,7 +125,13 @@ namespace HsumChaint.Domain.Features.User.Services
 
             try
             {
-                var query = _context.Invitations.Include(i => i.Role).AsNoTracking().Where(i => i.InvitedUserId == id);
+                var query = _context.Invitations
+                    .Include(i => i.SpaceRole)
+                    .Include(i => i.MonasterySpace)
+                    .Include(i => i.InvitedBy)
+                    .Include(i => i.InvitedUser)
+                    .AsNoTracking()
+                    .Where(i => i.InvitedUserId == id);
                 var totalCount = await query.CountAsync();
                 var items = await query.OrderBy(x => x.Id)
                     .Skip((pageNumber - 1) * pageSize)
@@ -151,7 +157,13 @@ namespace HsumChaint.Domain.Features.User.Services
 
             try
             {
-                var query = _context.Invitations.Include(i => i.Role).AsNoTracking().Where(i => i.InvitedById == id);
+                var query = _context.Invitations
+                    .Include(i => i.SpaceRole)
+                    .Include(i => i.MonasterySpace)
+                    .Include(i => i.InvitedBy)
+                    .Include(i => i.InvitedUser)
+                    .AsNoTracking()
+                    .Where(i => i.InvitedById == id);
                 var totalCount = await query.CountAsync();
                 var items = await query.OrderBy(x => x.Id)
                     .Skip((pageNumber - 1) * pageSize)
@@ -244,10 +256,13 @@ namespace HsumChaint.Domain.Features.User.Services
             {
                 Id = invitation.Id,
                 MonasterySpaceId = invitation.MonasterySpaceId,
+                MonasterySpaceName = invitation.MonasterySpace?.MonasteryName,
                 InvitedUserId = invitation.InvitedUserId,
+                InvitedUserName = invitation.InvitedUser?.Name,
                 InvitedById = invitation.InvitedById,
-                RoleId = invitation.RoleId,
-                RoleName = invitation.Role?.Name,
+                InvitedByName = invitation.InvitedBy?.Name,
+                SpaceRoleId = invitation.SpaceRoleId,
+                SpaceRoleName = invitation.SpaceRole?.Name,
                 Status = invitation.Status,
                 CreatedAt = invitation.CreatedAt
             };

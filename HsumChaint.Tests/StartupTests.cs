@@ -126,7 +126,7 @@ public class StartupTests
             new { PhoneNumber = "09100000002", Password = "Passw0rd!" });
         Assert.Equal(System.Net.HttpStatusCode.OK, login.StatusCode);
         var response = await System.Net.Http.Json.HttpContentJsonExtensions.ReadFromJsonAsync<HsumChaint.Shared.Result<HsumChaint.Domain.Features.Auth.DTOs.LoginResponseDto>>(login.Content);
-        Assert.Equal(15, response!.Data!.Permissions.Count);
+        Assert.Equal(HsumChaint.Shared.Authorization.Permissions.All.Count, response!.Data!.Permissions.Count);
         client.DefaultRequestHeaders.Authorization = new("Bearer", response.Data.AccessToken);
         Assert.Equal(System.Net.HttpStatusCode.OK, (await client.GetAsync("/api/v1/roles")).StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.OK, (await client.GetAsync("/api/v1/permissions")).StatusCode);
@@ -139,7 +139,7 @@ public class StartupTests
         var pagination = permissionPage.RootElement.GetProperty("pagination");
         Assert.Equal(2, pagination.GetProperty("pageNumber").GetInt32());
         Assert.Equal(3, pagination.GetProperty("pageSize").GetInt32());
-        Assert.Equal(15, pagination.GetProperty("totalCount").GetInt32());
+        Assert.Equal(HsumChaint.Shared.Authorization.Permissions.All.Count, pagination.GetProperty("totalCount").GetInt32());
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await client.GetAsync("/api/User?pageNumber=0")).StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, (await client.GetAsync("/api/User/999")).StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/donations?monasterySpaceId=999")).StatusCode);

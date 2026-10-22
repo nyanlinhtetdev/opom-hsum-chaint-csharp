@@ -21,12 +21,15 @@ public class RolePermissionServiceTests
     {
         await using var db = Context();
         var service = new RolePermissionService(db);
-        var created = await service.CreateRole(new() { Name = "Reviewer", PermissionIds = new() { 11, 13, 13 } });
+        var donationView = db.Permissions.Single(p => p.Name == Permissions.Donation.View);
+        var donationReview = db.Permissions.Single(p => p.Name == Permissions.Donation.Review);
+
+        var created = await service.CreateRole(new() { Name = "Reviewer", PermissionIds = new() { donationView.Id, donationReview.Id, donationReview.Id } });
         Assert.True(created.IsSuccess);
         Assert.Equal(2, created.Data!.Permissions.Count);
         var id = created.Data.Id;
-        Assert.True((await service.UpdateRole(id, new() { Name = "Custom Reviewer", PermissionIds = new() { 13 } })).IsSuccess);
-        Assert.True((await service.AssignPermissions(new() { RoleId = id, PermissionIds = new() { 11 } })).IsSuccess);
+        Assert.True((await service.UpdateRole(id, new() { Name = "Custom Reviewer", PermissionIds = new() { donationReview.Id } })).IsSuccess);
+        Assert.True((await service.AssignPermissions(new() { RoleId = id, PermissionIds = new() { donationView.Id } })).IsSuccess);
         Assert.Equal(2, await db.RolePermissions.CountAsync(rp => rp.RoleId == id));
         Assert.Equal("Donation.View", (await service.GetRoleById(id)).Data!.Permissions.Single().Name);
         Assert.Contains((await service.GetRoles()).Data!, r => r.Id == id && r.Name == "Custom Reviewer");
@@ -62,9 +65,9 @@ public class RolePermissionServiceTests
         db.Permissions.Add(new Permission { Id = 30, Name = "Custom.View" });
         await db.SaveChangesAsync();
         var service = new RolePermissionService(db);
-        Assert.False((await service.AssignPermissions(new() { RoleId = 1, PermissionIds = Enumerable.Range(1, 15).ToList() })).IsSuccess);
-        Assert.True((await service.AssignPermissions(new() { RoleId = 1, PermissionIds = Enumerable.Range(1, 15).Append(30).ToList() })).IsSuccess);
-        Assert.Equal(16, (await service.GetRoleById(1)).Data!.Permissions.Count);
+        Assert.False((await service.AssignPermissions(new() { RoleId = 1, PermissionIds = Enumerable.Range(1, Permissions.All.Count - 1).ToList() })).IsSuccess);
+        Assert.True((await service.AssignPermissions(new() { RoleId = 1, PermissionIds = Enumerable.Range(1, Permissions.All.Count).Append(30).ToList() })).IsSuccess);
+        Assert.Equal(Permissions.All.Count + 1, (await service.GetRoleById(1)).Data!.Permissions.Count);
     }
 
     [Fact]
@@ -75,7 +78,7 @@ public class RolePermissionServiceTests
         await db.SaveChangesAsync();
         Assert.True((await new RolePermissionService(db).AssignPermissions(new()
         {
-            RoleId = 1, PermissionIds = Enumerable.Range(2, 14).ToList()
+            RoleId = 1, PermissionIds = Enumerable.Range(2, Permissions.All.Count - 1).ToList()
         })).IsSuccess);
     }
 
@@ -87,24 +90,20 @@ public class RolePermissionServiceTests
         Assert.False((await service.CreateRole(new() { Name = " admin ", PermissionIds = new() })).IsSuccess);
         Assert.False((await service.CreateRole(new() { Name = " ", PermissionIds = new() })).IsSuccess);
         Assert.False((await service.CreateRole(new() { Name = "Invalid", PermissionIds = new() { 999 } })).IsSuccess);
-        db.Permissions.Find(11)!.IsDeleted = true;
+        var firstPerm = await db.Permissions.FirstAsync();
+        firstPerm.IsDeleted = true;
         await db.SaveChangesAsync();
-        Assert.False((await service.AssignPermissions(new() { RoleId = 3, PermissionIds = new() { 11 } })).IsSuccess);
+        Assert.False((await service.AssignPermissions(new() { RoleId = 3, PermissionIds = new() { firstPerm.Id } })).IsSuccess);
         Assert.False((await service.UpdateRole(3, new() { Name = "Changed", PermissionIds = new() { 999 } })).IsSuccess);
         Assert.Equal("User", db.Roles.Find(3)!.Name);
         Assert.False((await service.GetRoleById(999)).IsSuccess);
     }
 
-    [Theory]
-    [InlineData("user")]
-    [InlineData("member")]
-    [InlineData("invitation")]
-    public async Task DeleteRole_RejectsReferencedRole(string reference)
+    [Fact]
+    public async Task DeleteRole_RejectsReferencedRole()
     {
         await using var db = Context();
-        if (reference == "user") db.Users.Add(new User { Name = "User", PhoneNumber = "091", Password = "pw", RoleId = 3, IsDeleted = false });
-        if (reference == "member") db.MonasteryMembers.Add(new MonasteryMember { RoleId = 3 });
-        if (reference == "invitation") db.Invitations.Add(new Invitation { RoleId = 3, Status = Shared.CommonEnum.InvitationStatus.Pending });
+        db.Users.Add(new User { Name = "User", PhoneNumber = "091", Password = "pw", RoleId = 3, IsDeleted = false });
         await db.SaveChangesAsync();
         Assert.False((await new RolePermissionService(db).DeleteRole(3)).IsSuccess);
         Assert.False(db.Roles.Find(3)!.IsDeleted);

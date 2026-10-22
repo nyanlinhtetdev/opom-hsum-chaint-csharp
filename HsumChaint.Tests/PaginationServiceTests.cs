@@ -5,6 +5,7 @@ using HsumChaint.Domain.Features.Notification.Providers;
 using HsumChaint.Domain.Features.RolePermission.Services;
 using HsumChaint.Domain.Features.User.Services;
 using HsumChaint.Shared;
+using HsumChaint.Shared.Authorization;
 using HsumChaint.Shared.CommonEnum;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -33,8 +34,8 @@ public class PaginationServiceTests
         var service = new UserService(db);
         var first = await service.GetAllUsers();
         Assert.Equal(Enumerable.Range(1, 10), first.Data.Select(u => u.Id));
-        Assert.Equal(12, first.Pagination.TotalCount);
         Assert.True(first.Pagination.HasNextPage);
+        Assert.Equal(12, first.Pagination.TotalCount);
         var second = await service.GetAllUsers(new() { PageNumber = 2 });
         Assert.Equal(new[] { 11, 12 }, second.Data.Select(u => u.Id));
         Assert.False(second.Pagination.HasNextPage);
@@ -50,10 +51,10 @@ public class PaginationServiceTests
         await using var db = Context();
         for (var id = 1; id <= 12; id++)
         {
-            db.Invitations.Add(new Invitation { Id = id, InvitedUserId = 1, InvitedById = 2, RoleId = 3 });
+            db.Invitations.Add(new Invitation { Id = id, InvitedUserId = 1, InvitedById = 2, SpaceRoleId = SpaceRoles.ViewerId });
             db.Notifications.Add(new Notification { Id = id, UserId = 1, IsDelete = false });
         }
-        db.Invitations.Add(new Invitation { Id = 13, InvitedUserId = 9, InvitedById = 9, RoleId = 3 });
+        db.Invitations.Add(new Invitation { Id = 13, InvitedUserId = 9, InvitedById = 9, SpaceRoleId = SpaceRoles.ViewerId });
         db.Notifications.Add(new Notification { Id = 13, UserId = 9, IsDelete = false });
         db.Notifications.Add(new Notification { Id = 14, UserId = 1, IsDelete = true });
         await db.SaveChangesAsync();
@@ -98,10 +99,10 @@ public class PaginationServiceTests
         {
             db.Users.Add(new User { Id = id, Name = $"User {id}", PhoneNumber = $"09{id}", Password = "pw", RoleId = 3, IsDeleted = false });
             db.MonasterySpaces.Add(new MonasterySpace { Id = id, MonasteryName = $"Monastery {id}" });
-            db.MonasteryMembers.Add(new MonasteryMember { Id = id, UserId = 1, MonasterySpaceId = id, RoleId = 3 });
+            db.MonasteryMembers.Add(new MonasteryMember { Id = id, UserId = 1, MonasterySpaceId = id, SpaceRoleId = SpaceRoles.OwnerId, IsOwner = true });
         }
         for (var id = 2; id <= 12; id++)
-            db.MonasteryMembers.Add(new MonasteryMember { Id = id + 12, UserId = id, MonasterySpaceId = 1, RoleId = 3 });
+            db.MonasteryMembers.Add(new MonasteryMember { Id = id + 12, UserId = id, MonasterySpaceId = 1, SpaceRoleId = SpaceRoles.ViewerId });
         db.MonasterySpaces.Add(new MonasterySpace { Id = 13, MonasteryName = "Other" });
         await db.SaveChangesAsync();
         var service = new MonasteryService(db);
@@ -130,8 +131,8 @@ public class PaginationServiceTests
         var first = await service.GetPermissions();
         var second = await service.GetPermissions(new() { PageNumber = 2 });
         Assert.Equal(10, first.Data.Count);
-        Assert.Equal(4, second.Data.Count);
-        Assert.Equal(14, first.Pagination.TotalCount);
+        Assert.Equal(HsumChaint.Shared.Authorization.Permissions.All.Count - 1 - 10, second.Data.Count);
+        Assert.Equal(HsumChaint.Shared.Authorization.Permissions.All.Count - 1, first.Pagination.TotalCount);
         Assert.Empty(first.Data.Select(p => p.Id).Intersect(second.Data.Select(p => p.Id)));
         Assert.DoesNotContain(first.Data.Concat(second.Data), p => p.Id == 1);
     }

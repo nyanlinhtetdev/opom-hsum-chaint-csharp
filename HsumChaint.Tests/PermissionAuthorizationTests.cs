@@ -50,4 +50,19 @@ public class PermissionAuthorizationTests
             Assert.Contains(policy.Requirements, r => r is PermissionRequirement pr && pr.Permission == permission);
         }
     }
+
+    [Fact]
+    public void MonasteriesController_Delete_HasMonasteryDeletePermissionAttribute()
+    {
+        var method = typeof(HsumChaint.API.Features.Monastery.Controllers.MonasteriesController)
+            .GetMethod(nameof(HsumChaint.API.Features.Monastery.Controllers.MonasteriesController.Delete));
+
+        Assert.NotNull(method);
+        var attribute = method!.GetCustomAttributes(typeof(HasPermissionAttribute), inherit: true)
+            .Cast<HasPermissionAttribute>()
+            .SingleOrDefault();
+
+        Assert.NotNull(attribute);
+        Assert.Equal(SpacePermissions.SpaceDelete, attribute!.Policy);
+    }
 }
