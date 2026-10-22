@@ -5,16 +5,17 @@ namespace HsumChaint.Domain.Features.Monastery.ServiceInterfaces
 {
     public interface IMonasteryService
     {
-        Task<PagedResult<MonasterySpaceDto>> GetMonasteries(string? searchTerm, PaginationRequest? pagination = null);
+        Task<PagedResult<MonasterySpaceDto>> GetMonasteries(GetMonasteriesRequestDto request);
+        Task<PagedResult<MonasterySpaceDto>> SearchMonasteries(SearchMonasteriesRequestDto request);
         Task<Result<MonasterySpaceDto>> CreateMonastery(int currentUserId, CreateMonasteryRequestDto request);
-        Task<Result<MonasterySpaceDto>> UpdateMonastery(int currentUserId, int monasterySpaceId, UpdateMonasteryRequestDto request);
-        Task<Result<bool>> DeleteMonastery(int currentUserId, int monasterySpaceId);
-        Task<Result<MonasterySpaceDto>> GetMonastery(int currentUserId, int monasterySpaceId);
+        Task<Result<MonasterySpaceDto>> UpdateMonastery(int currentUserId, UpdateMonasteryRequestDto request);
+        Task<Result<bool>> DeleteMonastery(int currentUserId, DeleteMonasteryRequestDto request);
+        Task<Result<MonasterySpaceDto>> GetMonastery(int currentUserId, GetMonasteryRequestDto request);
         Task<PagedResult<MonasterySpaceDto>> GetMyMonasteries(int currentUserId, PaginationRequest? pagination = null);
-        Task<Result<InvitationResponseDto>> InviteMember(int currentUserId, int monasterySpaceId, InviteMemberRequestDto request);
-        Task<Result<InvitationResponseDto>> RespondToInvitation(int currentUserId, int invitationId, RespondInvitationRequestDto request);
-        Task<PagedResult<MonasteryMemberDto>> GetMembers(int currentUserId, int monasterySpaceId, PaginationRequest? pagination = null);
-        Task<Result<MonasteryMemberDto>> UpdateMemberRole(int currentUserId, int monasterySpaceId, int memberUserId, UpdateMemberRoleRequestDto request);
-        Task<Result<MonasteryMemberDto>> RemoveMember(int currentUserId, int monasterySpaceId, int memberUserId);
+        Task<Result<InvitationResponseDto>> InviteMember(int currentUserId, InviteMemberRequestDto request);
+        Task<Result<InvitationResponseDto>> RespondToInvitation(int currentUserId, RespondInvitationRequestDto request);
+        Task<PagedResult<MonasteryMemberDto>> GetMembers(int currentUserId, GetMonasteryMembersRequestDto request);
+        Task<Result<MonasteryMemberDto>> UpdateMemberRole(int currentUserId, UpdateMemberRoleRequestDto request);
+        Task<Result<MonasteryMemberDto>> RemoveMember(int currentUserId, RemoveMemberRequestDto request);
     }
 }

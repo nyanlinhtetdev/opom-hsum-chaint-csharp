@@ -28,6 +28,12 @@ public class RolePermissionService(AppDbContext db) : IRolePermissionService
         return PagedResult<RoleDto>.Success(roles, new Pagination(pageNumber, pageSize, totalCount), "Roles retrieved successfully.");
     }
 
+    public Task<Result<RoleDto>> GetRole(GetRoleRequestDto request) => GetRoleById(request.Id);
+
+    public Task<Result<RoleDto>> UpdateRole(UpdateRoleRequestDto request) => UpdateRole(request.Id, request);
+
+    public Task<Result<bool>> DeleteRole(DeleteRoleRequestDto request) => DeleteRole(request.Id);
+
     public async Task<Result<RoleDto>> GetRoleById(int id)
     {
         var role = await RolesWithPermissions.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);

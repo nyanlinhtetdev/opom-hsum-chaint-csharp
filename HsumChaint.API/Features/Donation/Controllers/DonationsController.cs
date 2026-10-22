@@ -72,7 +72,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.GetDonation(currentUserId.Value, id);
+            var request = new GetDonationRequestDto { Id = id };
+            var response = await _donationService.GetDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -86,7 +87,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.ReviewDonation(currentUserId.Value, id, request);
+            request.Id = id;
+            var response = await _donationService.ReviewDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -100,7 +102,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.ScheduleDonation(currentUserId.Value, id, request);
+            request.Id = id;
+            var response = await _donationService.ScheduleDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -114,7 +117,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.CompleteDonation(currentUserId.Value, id);
+            var request = new CompleteDonationRequestDto { Id = id };
+            var response = await _donationService.CompleteDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -128,7 +132,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.CancelDonation(currentUserId.Value, id);
+            var request = new CancelDonationRequestDto { Id = id };
+            var response = await _donationService.CancelDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 
@@ -184,7 +189,8 @@ namespace HsumChaint.API.Features.Donation.Controllers
                 return Unauthorized();
             }
 
-            var response = await _donationService.DeleteDonation(currentUserId.Value, id);
+            var request = new DeleteDonationRequestDto { Id = id };
+            var response = await _donationService.DeleteDonation(currentUserId.Value, request);
             return response.ToActionResult();
         }
 

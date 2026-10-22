@@ -38,7 +38,8 @@ namespace HsumChaint.API.Features.User.Controllers
                 return Forbid();
             }
 
-            var user = await _userService.GetUser(id);
+            var request = new GetUserRequestDto { Id = id };
+            var user = await _userService.GetUser(request);
 
             return user.ToActionResult();
         }
@@ -62,7 +63,7 @@ namespace HsumChaint.API.Features.User.Controllers
                 }
 
                 // Normal users cannot elevate or alter their role
-                var existingUser = await _userService.GetUser(user.Id);
+                var existingUser = await _userService.GetUser(new GetUserRequestDto { Id = user.Id });
                 if (existingUser.Data != null)
                 {
                     user.RoleId = existingUser.Data.RoleId;
@@ -78,7 +79,8 @@ namespace HsumChaint.API.Features.User.Controllers
         [HasPermission(Permissions.Users.Manage)]
         public async Task<IActionResult> DeleteUser(int id)
         {
-            var deletedResult = await _userService.DeleteUser(id);
+            var request = new DeleteUserRequestDto { Id = id };
+            var deletedResult = await _userService.DeleteUser(request);
 
             return deletedResult.ToActionResult();
         }
@@ -95,7 +97,13 @@ namespace HsumChaint.API.Features.User.Controllers
                 return Forbid();
             }
 
-            var invitationList = await _userService.GetUserInvitationList(id, pagination);
+            var request = new GetUserInvitationsRequestDto
+            {
+                Id = id,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize
+            };
+            var invitationList = await _userService.GetUserInvitationList(request);
 
             return invitationList.ToActionResult();
         }
@@ -110,7 +118,13 @@ namespace HsumChaint.API.Features.User.Controllers
                 return Forbid();
             }
 
-            var invitedByOtherList = await _userService.GetInvitedByOtherList(id, pagination);
+            var request = new GetInvitedByOtherRequestDto
+            {
+                Id = id,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize
+            };
+            var invitedByOtherList = await _userService.GetInvitedByOtherList(request);
 
             return invitedByOtherList.ToActionResult();
         }
@@ -129,7 +143,13 @@ namespace HsumChaint.API.Features.User.Controllers
                 return Forbid();
             }
 
-            var notificationList = await _userService.GetUserNotificationList(id, pagination);
+            var request = new GetUserNotificationsRequestDto
+            {
+                Id = id,
+                PageNumber = pagination.PageNumber,
+                PageSize = pagination.PageSize
+            };
+            var notificationList = await _userService.GetUserNotificationList(request);
 
             return notificationList.ToActionResult();
         }
@@ -144,7 +164,8 @@ namespace HsumChaint.API.Features.User.Controllers
                 return Forbid();
             }
 
-            var deletedNotificationResult = await _userService.DeleteUserNotificationList(id);
+            var request = new DeleteUserNotificationsRequestDto { Id = id };
+            var deletedNotificationResult = await _userService.DeleteUserNotificationList(request);
 
             return deletedNotificationResult.ToActionResult();
         }
@@ -162,7 +183,8 @@ namespace HsumChaint.API.Features.User.Controllers
             }
 
             var currentUserId = User.GetCurrentUserId();
-            var response = await _userService.GetMonkProfile(currentUserId ?? 0, id);
+            var request = new GetMonkProfileRequestDto { UserId = id };
+            var response = await _userService.GetMonkProfile(currentUserId ?? 0, request);
             return response.ToActionResult();
         }
 
@@ -174,8 +196,9 @@ namespace HsumChaint.API.Features.User.Controllers
                 return Forbid();
             }
 
+            request.UserId = id;
             var currentUserId = User.GetCurrentUserId();
-            var response = await _userService.UpdateMonkProfile(currentUserId ?? 0, id, request);
+            var response = await _userService.UpdateMonkProfile(currentUserId ?? 0, request);
             return response.ToActionResult();
         }
 
@@ -192,7 +215,8 @@ namespace HsumChaint.API.Features.User.Controllers
             }
 
             var currentUserId = User.GetCurrentUserId();
-            var response = await _userService.GetUserSettings(currentUserId ?? 0, id);
+            var request = new GetUserSettingsRequestDto { UserId = id };
+            var response = await _userService.GetUserSettings(currentUserId ?? 0, request);
             return response.ToActionResult();
         }
 
@@ -204,8 +228,9 @@ namespace HsumChaint.API.Features.User.Controllers
                 return Forbid();
             }
 
+            request.UserId = id;
             var currentUserId = User.GetCurrentUserId();
-            var response = await _userService.UpdateUserSettings(currentUserId ?? 0, id, request);
+            var response = await _userService.UpdateUserSettings(currentUserId ?? 0, request);
             return response.ToActionResult();
         }
 

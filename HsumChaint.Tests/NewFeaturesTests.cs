@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using HsumChaint.Database.Models;
 using HsumChaint.Domain.Features.Donation.DTOs;
 using HsumChaint.Domain.Features.Donation.Services;
+using HsumChaint.Domain.Features.Monastery.DTOs;
 using HsumChaint.Domain.Features.Monastery.Services;
 using HsumChaint.Domain.Features.Notification.Providers;
 using HsumChaint.Domain.Features.User.DTOs;
@@ -44,19 +45,19 @@ public class NewFeaturesTests
 
         var service = new MonasteryService(db);
 
-        // 1. All active monasteries
-        var resultAll = await service.GetMonasteries(null, new PaginationRequest { PageNumber = 1, PageSize = 10 });
+        // 1. All active monasteries (pure listing)
+        var resultAll = await service.GetMonasteries(new GetMonasteriesRequestDto { PageNumber = 1, PageSize = 10 });
         Assert.True(resultAll.IsSuccess);
         Assert.Equal(2, resultAll.Data!.Count);
 
         // 2. Search by name
-        var resultSearchName = await service.GetMonasteries("Maha", new PaginationRequest { PageNumber = 1, PageSize = 10 });
+        var resultSearchName = await service.SearchMonasteries(new SearchMonasteriesRequestDto { Keyword = "Maha", PageNumber = 1, PageSize = 10 });
         Assert.True(resultSearchName.IsSuccess);
         Assert.Single(resultSearchName.Data!);
         Assert.Equal("Mahagandhayon", resultSearchName.Data[0].MonasteryName);
 
         // 3. Search by address
-        var resultSearchAddress = await service.GetMonasteries("Bagan", new PaginationRequest { PageNumber = 1, PageSize = 10 });
+        var resultSearchAddress = await service.SearchMonasteries(new SearchMonasteriesRequestDto { Keyword = "Bagan", PageNumber = 1, PageSize = 10 });
         Assert.True(resultSearchAddress.IsSuccess);
         Assert.Single(resultSearchAddress.Data!);
         Assert.Equal("Kyauk Gu", resultSearchAddress.Data[0].MonasteryName);
@@ -369,5 +370,29 @@ public class NewFeaturesTests
         var day10 = result.Data.Days.First(d => d.Day == 10);
         Assert.Equal(1, day10.DonationsCount);
         Assert.Equal("2026-11-10", day10.Date);
+    }
+
+    [Fact]
+    public async Task GetDonations_OrdersAscendingByDefault()
+    {
+        await using var db = CreateDbContext();
+        var mockNotification = new Mock<IFirebaseNotificationProvider>();
+
+        db.Users.Add(new User { Id = 1, Name = "Monk Owner", PhoneNumber = "091", Password = "pw", RoleId = 2, IsDeleted = false });
+        db.MonasterySpaces.Add(new MonasterySpace { Id = 600, MonasteryName = "Space 600", CreatedById = 1 });
+        db.MonasteryMembers.Add(new MonasteryMember { UserId = 1, MonasterySpaceId = 600, SpaceRoleId = SpaceRoles.OwnerId, IsOwner = true });
+
+        db.DonorLists.AddRange(
+            new DonorList { Id = 1, MonasterySpaceId = 600, DonorName = "Earlier", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new DonorList { Id = 2, MonasterySpaceId = 600, DonorName = "Later", CreatedAt = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc) }
+        );
+        await db.SaveChangesAsync();
+
+        var donationService = new DonationService(db, mockNotification.Object);
+        var result = await donationService.GetDonations(1, new DonationQueryDto { MonasterySpaceId = 600, PageNumber = 1, PageSize = 10 });
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Data!.Count);
+        Assert.Equal(1, result.Data[0].Id);
+        Assert.Equal(2, result.Data[1].Id);
     }
 }

@@ -84,7 +84,7 @@ public class PaginationServiceTests
         var service = new DonationService(db, Mock.Of<IFirebaseNotificationProvider>());
         var result = await service.GetDonations(1, new() { PageNumber = 2, PageSize = 5, Status = DonationStatus.Accepted, FromDate = date, ToDate = date });
         Assert.True(result.IsSuccess);
-        Assert.Equal(new[] { 7, 6, 5, 4, 3 }, result.Data.Select(d => d.Id));
+        Assert.Equal(new[] { 6, 7, 8, 9, 10 }, result.Data.Select(d => d.Id));
         Assert.Equal(12, result.Pagination.TotalCount);
         Assert.Equal(3, result.Pagination.TotalPages);
         Assert.True((await service.GetDonations(1, new() { MonasterySpaceId = 10 })).IsFailure);

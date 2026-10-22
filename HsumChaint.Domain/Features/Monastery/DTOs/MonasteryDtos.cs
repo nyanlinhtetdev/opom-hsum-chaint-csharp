@@ -2,6 +2,24 @@ using HsumChaint.Shared.CommonEnum;
 
 namespace HsumChaint.Domain.Features.Monastery.DTOs
 {
+    public class GetMonasteriesRequestDto
+    {
+        public int PageNumber { get; set; } = 1;
+        public int PageSize { get; set; } = 10;
+    }
+
+    public class SearchMonasteriesRequestDto
+    {
+        public string? Keyword { get; set; }
+        public int PageNumber { get; set; } = 1;
+        public int PageSize { get; set; } = 10;
+    }
+
+    public class GetMonasteryRequestDto
+    {
+        public int Id { get; set; }
+    }
+
     public class CreateMonasteryRequestDto
     {
         public string? MonasteryName { get; set; }
@@ -11,9 +29,15 @@ namespace HsumChaint.Domain.Features.Monastery.DTOs
 
     public class UpdateMonasteryRequestDto
     {
+        public int Id { get; set; }
         public string? MonasteryName { get; set; }
         public string? Description { get; set; }
         public string? Address { get; set; }
+    }
+
+    public class DeleteMonasteryRequestDto
+    {
+        public int Id { get; set; }
     }
 
     public class MonasterySpaceDto
@@ -30,6 +54,7 @@ namespace HsumChaint.Domain.Features.Monastery.DTOs
 
     public class InviteMemberRequestDto
     {
+        public int MonasterySpaceId { get; set; }
         public int? UserId { get; set; }
         public string? PhoneNumber { get; set; }
         public int SpaceRoleId { get; set; }
@@ -49,6 +74,7 @@ namespace HsumChaint.Domain.Features.Monastery.DTOs
 
     public class RespondInvitationRequestDto
     {
+        public int InvitationId { get; set; }
         public InvitationStatus Status { get; set; }
     }
 
@@ -64,8 +90,23 @@ namespace HsumChaint.Domain.Features.Monastery.DTOs
         public bool IsOwner { get; set; }
     }
 
+    public class GetMonasteryMembersRequestDto
+    {
+        public int MonasterySpaceId { get; set; }
+        public int PageNumber { get; set; } = 1;
+        public int PageSize { get; set; } = 10;
+    }
+
     public class UpdateMemberRoleRequestDto
     {
+        public int MonasterySpaceId { get; set; }
+        public int MemberUserId { get; set; }
         public int SpaceRoleId { get; set; }
+    }
+
+    public class RemoveMemberRequestDto
+    {
+        public int MonasterySpaceId { get; set; }
+        public int MemberUserId { get; set; }
     }
 }

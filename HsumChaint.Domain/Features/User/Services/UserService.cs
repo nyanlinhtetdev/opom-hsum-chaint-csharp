@@ -478,5 +478,24 @@ namespace HsumChaint.Domain.Features.User.Services
 
             return true;
         }
+    
+        public Task<Result<UserDto>> GetUser(GetUserRequestDto request) => GetUser(request.Id);
+        public Task<Result> DeleteUser(DeleteUserRequestDto request) => DeleteUser(request.Id);
+        public Task<PagedResult<InvitationDto>> GetUserInvitationList(GetUserInvitationsRequestDto request) =>
+            GetUserInvitationList(request.Id, new PaginationRequest { PageNumber = request.PageNumber, PageSize = request.PageSize });
+        public Task<PagedResult<InvitationDto>> GetInvitedByOtherList(GetInvitedByOtherRequestDto request) =>
+            GetInvitedByOtherList(request.Id, new PaginationRequest { PageNumber = request.PageNumber, PageSize = request.PageSize });
+        public Task<PagedResult<NotificationDto>> GetUserNotificationList(GetUserNotificationsRequestDto request) =>
+            GetUserNotificationList(request.Id, new PaginationRequest { PageNumber = request.PageNumber, PageSize = request.PageSize });
+        public Task<Result> DeleteUserNotificationList(DeleteUserNotificationsRequestDto request) =>
+            DeleteUserNotificationList(request.Id);
+        public Task<Result<MonkProfileDto>> GetMonkProfile(int currentUserId, GetMonkProfileRequestDto request) =>
+            GetMonkProfile(currentUserId, request.UserId);
+        public Task<Result<MonkProfileDto>> UpdateMonkProfile(int currentUserId, UpdateMonkProfileRequestDto request) =>
+            UpdateMonkProfile(currentUserId, request.UserId, request);
+        public Task<Result<UserSettingDto>> GetUserSettings(int currentUserId, GetUserSettingsRequestDto request) =>
+            GetUserSettings(currentUserId, request.UserId);
+        public Task<Result<UserSettingDto>> UpdateUserSettings(int currentUserId, UpdateUserSettingRequestDto request) =>
+            UpdateUserSettings(currentUserId, request.UserId, request);
     }
 }
