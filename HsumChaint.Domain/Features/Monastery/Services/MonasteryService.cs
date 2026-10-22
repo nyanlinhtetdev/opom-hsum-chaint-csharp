@@ -277,7 +277,10 @@ namespace HsumChaint.Domain.Features.Monastery.Services
             }
 
             var member = await GetMember(currentUserId, monasterySpaceId);
-            if (member == null) return PagedResult<MonasteryMemberDto>.Failure("User is not a member of this monastery.");
+            if (!await HasPermissionTo(currentUserId, member, SpacePermissions.SpaceViewMembers))
+            {
+                return PagedResult<MonasteryMemberDto>.Failure("User is not authorized to view members of this monastery.");
+            }
             var query = from membership in _dbContext.MonasteryMembers.AsNoTracking()
                         join user in _dbContext.Users.AsNoTracking() on membership.UserId equals user.Id
                         where membership.MonasterySpaceId == monasterySpaceId

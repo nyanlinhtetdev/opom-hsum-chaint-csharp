@@ -12,6 +12,7 @@ public static class SpacePermissions
     public const string SpaceInviteMember = "Space.InviteMember";
     public const string SpaceUpdateMemberRole = "Space.UpdateMemberRole";
     public const string SpaceRemoveMember = "Space.RemoveMember";
+    public const string SpaceViewMembers = "Space.ViewMembers";
 
     public const string DonationView = "Donation.View";
     public const string DonationCreate = "Donation.Create";
@@ -22,7 +23,7 @@ public static class SpacePermissions
     public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(new[]
     {
         SpaceView, SpaceUpdate, SpaceDelete, SpaceTransferOwnership,
-        SpaceInviteMember, SpaceUpdateMemberRole, SpaceRemoveMember,
+        SpaceInviteMember, SpaceUpdateMemberRole, SpaceRemoveMember, SpaceViewMembers,
         DonationView, DonationCreate, DonationReview, DonationSchedule, DonationCancel
     });
 }

@@ -12,6 +12,17 @@ public static class Permissions
     {
         public const string View = "Users.View";
         public const string Manage = "Users.Manage";
+        public const string Update = "Users.Update";
+    }
+    public static class Invitation
+    {
+        public const string View = "Invitation.View";
+        public const string Respond = "Invitation.Respond";
+    }
+    public static class Notification
+    {
+        public const string View = "Notification.View";
+        public const string Manage = "Notification.Manage";
     }
     public static class Monastery
     {
@@ -32,7 +43,10 @@ public static class Permissions
 
     public static IReadOnlyList<string> All { get; } = Array.AsReadOnly(new[]
     {
-        Roles.View, Roles.Manage, Roles.Assign, Users.View, Users.Manage,
+        Roles.View, Roles.Manage, Roles.Assign,
+        Users.View, Users.Manage, Users.Update,
+        Invitation.View, Invitation.Respond,
+        Notification.View, Notification.Manage,
         Monastery.Create, Monastery.View, Monastery.Update, Monastery.Delete, Monastery.ManageMembers,
         Donation.View, Donation.Create, Donation.Review, Donation.Schedule, Donation.Cancel
     });
