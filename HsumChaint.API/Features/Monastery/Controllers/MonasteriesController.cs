@@ -193,5 +193,31 @@ namespace HsumChaint.API.Features.Monastery.Controllers
             var response = await _monasteryService.RemoveMember(currentUserId.Value, request);
             return response.ToActionResult();
         }
+
+        [HttpGet("{id}/permissions")]
+        public async Task<IActionResult> GetPermissions(int id)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var response = await _monasteryService.GetSpacePermissions(currentUserId.Value, id);
+            return response.ToActionResult();
+        }
+
+        [HttpGet("{id}/roles")]
+        public async Task<IActionResult> GetRoles(int id)
+        {
+            var currentUserId = User.GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized();
+            }
+
+            var response = await _monasteryService.GetSpaceRoles(currentUserId.Value, id);
+            return response.ToActionResult();
+        }
     }
 }
