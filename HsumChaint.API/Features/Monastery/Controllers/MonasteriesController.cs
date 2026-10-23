@@ -79,7 +79,7 @@ namespace HsumChaint.API.Features.Monastery.Controllers
             return response.ToActionResult();
         }
 
-        [HttpPut("{id}")]
+        [HttpPatch("{id}")]
         [HasPermission(SpacePermissions.SpaceUpdate)]
         public async Task<IActionResult> Update(int id, UpdateMonasteryRequestDto request)
         {

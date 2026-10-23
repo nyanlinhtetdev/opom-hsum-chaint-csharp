@@ -74,9 +74,18 @@ namespace HsumChaint.Domain.Features.Monastery.Services
                 return Result<MonasterySpaceDto>.Failure("Monastery not found.");
             }
 
-            monastery.MonasteryName = string.IsNullOrWhiteSpace(request.MonasteryName) ? monastery.MonasteryName : request.MonasteryName;
-            monastery.Description = request.Description;
-            monastery.Address = request.Address;
+            if (!string.IsNullOrWhiteSpace(request.MonasteryName))
+            {
+                monastery.MonasteryName = request.MonasteryName;
+            }
+            if (request.Description != null)
+            {
+                monastery.Description = request.Description;
+            }
+            if (request.Address != null)
+            {
+                monastery.Address = request.Address;
+            }
             await _dbContext.SaveChangesAsync();
 
             return Result<MonasterySpaceDto>.Success(MapMonastery(monastery, member!.SpaceRoleId, member.SpaceRole?.Name, member.IsOwner == true), "Monastery updated successfully.");

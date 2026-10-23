@@ -286,8 +286,14 @@ namespace HsumChaint.Domain.Features.User.Services
                 }
                 else
                 {
-                    profile.MonasteryName = request.MonasteryName;
-                    profile.MonasteryAddress = request.MonasteryAddress;
+                    if (request.MonasteryName != null)
+                    {
+                        profile.MonasteryName = request.MonasteryName;
+                    }
+                    if (request.MonasteryAddress != null)
+                    {
+                        profile.MonasteryAddress = request.MonasteryAddress;
+                    }
                     _context.MonkProfiles.Update(profile);
                 }
 
@@ -308,6 +314,7 @@ namespace HsumChaint.Domain.Features.User.Services
                 return Result<MonkProfileDto>.Failure($"Application Layer Exception: {ex.Message}");
             }
         }
+
         #endregion
 
         #region UserSettings

@@ -188,7 +188,7 @@ namespace HsumChaint.API.Features.User.Controllers
             return response.ToActionResult();
         }
 
-        [HttpPut("{id}/monk-profile")]
+        [HttpPatch("{id}/monk-profile")]
         public async Task<IActionResult> UpdateMonkProfile(int id, UpdateMonkProfileRequestDto request)
         {
             if (!CanAccessUserResource(id))

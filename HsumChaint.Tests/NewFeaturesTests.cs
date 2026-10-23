@@ -100,6 +100,16 @@ public class NewFeaturesTests
         var getUpdated = await userService.GetMonkProfile(10, 10);
         Assert.True(getUpdated.IsSuccess);
         Assert.Equal("Panditarama", getUpdated.Data!.MonasteryName);
+
+        // 4. Null fields are preserved during partial updates.
+        var partialUpdate = new UpdateMonkProfileRequestDto { MonasteryName = "Updated name" };
+        var partialResult = await userService.UpdateMonkProfile(10, 10, partialUpdate);
+        Assert.Equal("Updated name", partialResult.Data!.MonasteryName);
+        Assert.Equal("Shwe Taung Gon, Yangon", partialResult.Data.MonasteryAddress);
+
+        var nullResult = await userService.UpdateMonkProfile(10, 10, new UpdateMonkProfileRequestDto { MonasteryAddress = null });
+        Assert.Equal("Updated name", nullResult.Data!.MonasteryName);
+        Assert.Equal("Shwe Taung Gon, Yangon", nullResult.Data.MonasteryAddress);
     }
 
     [Fact]
